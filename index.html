@@ -1202,6 +1202,24 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
   <script>
+    // === ตั้งค่าลิงก์ Google Apps Script Web App (/exec) ===
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyWYLGn1k11j-3I0inqe6OkQLpqHsscpLDleVmUY7hiMKkQy2O7kyNDQyE7obD-iHgZjg/exec";
+
+    async function callGasApi(action, payload) {
+      if (!GAS_API_URL || GAS_API_URL === "https://script.google.com/macros/s/AKfycbyWYLGn1k11j-3I0inqe6OkQLpqHsscpLDleVmUY7hiMKkQy2O7kyNDQyE7obD-iHgZjg/exec") {
+        throw new Error("กรุณาใส่ลิงก์ Google Apps Script Web App ในตัวแปร GAS_API_URL ก่อนใช้งาน");
+      }
+      const response = await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: action, payload: payload || {} })
+      });
+      if (!response.ok) {
+        throw new Error("HTTP Error: " + response.status);
+      }
+      return await response.json();
+    }
+
     let buildingsList = [];
     let selectedBuilding = null;
     let selectedDateFilter = 'ALL'; // 'ALL' หรือ 'yyyy-MM-dd'
@@ -1254,8 +1272,8 @@
     // ==============================================
     function loadBuildings() {
       const container = document.getElementById('buildingsList');
-      google.script.run
-        .withSuccessHandler(res => {
+      callGasApi('getBuildingsData', {})
+        .then(res => {
           if (res.status === 'success') {
             buildingsList = res.buildings || [];
             renderBuildings();
@@ -1263,10 +1281,9 @@
             container.innerHTML = `<div class="alert alert-danger">${res.message}</div>`;
           }
         })
-        .withFailureHandler(err => {
-          container.innerHTML = `<div class="alert alert-danger">โหลดข้อมูลไม่สำเร็จ: ${err}</div>`;
-        })
-        .getBuildingsData();
+        .catch(err => {
+          container.innerHTML = `<div class="alert alert-danger">โหลดข้อมูลไม่สำเร็จ: ${err.message || err}</div>`;
+        });
     }
 
     function renderBuildings() {
@@ -1448,8 +1465,8 @@
         newImageBase64: document.getElementById('editBldNewBase64').value
       };
 
-      google.script.run
-        .withSuccessHandler(res => {
+      callGasApi('saveBuildingInfo', payload)
+        .then(res => {
           btn.disabled = false;
           btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> บันทึกการแก้ไข';
           if (res.status === 'success') {
@@ -1461,12 +1478,11 @@
             Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message });
           }
         })
-        .withFailureHandler(err => {
+        .catch(err => {
           btn.disabled = false;
           btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> บันทึกการแก้ไข';
-          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.toString() });
-        })
-        .saveBuildingInfo(payload);
+          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
+        });
     }
 
     // ==============================================
@@ -1612,8 +1628,8 @@
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> กำลังบันทึกและอัปโหลดรูปภาพ...';
 
-      google.script.run
-        .withSuccessHandler(res => {
+      callGasApi('saveWorkLog', payload)
+        .then(res => {
           submitBtn.disabled = false;
           submitBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up me-2"></i> บันทึกข้อมูลงานหน้างาน';
 
@@ -1657,12 +1673,11 @@
             Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: res.message });
           }
         })
-        .withFailureHandler(err => {
+        .catch(err => {
           submitBtn.disabled = false;
           submitBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up me-2"></i> บันทึกข้อมูลงานหน้างาน';
-          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.toString() });
-        })
-        .saveWorkLog(payload);
+          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
+        });
     }
 
     // ==============================================
@@ -1860,8 +1875,12 @@
         </div>
       `;
 
-      google.script.run
-        .withSuccessHandler(res => {
+      callGasApi('getWorkLogs', {
+          buildingId: selectedBuilding.id,
+          buildingName: selectedBuilding.name,
+          date: 'ALL'
+        })
+        .then(res => {
           if (res.status === 'success') {
             window._currentLogsCache = res.logs || [];
             if (calendarVisible) renderCalendar();
@@ -1870,13 +1889,8 @@
             container.innerHTML = `<div class="alert alert-danger">${res.message}</div>`;
           }
         })
-        .withFailureHandler(err => {
-          container.innerHTML = `<div class="alert alert-danger">เกิดข้อผิดพลาด: ${err}</div>`;
-        })
-        .getWorkLogs({
-          buildingId: selectedBuilding.id,
-          buildingName: selectedBuilding.name,
-          date: 'ALL'
+        .catch(err => {
+          container.innerHTML = `<div class="alert alert-danger">เกิดข้อผิดพลาด: ${err.message || err}</div>`;
         });
     }
 
@@ -2004,8 +2018,8 @@
 
       selectEl.disabled = true;
 
-      google.script.run
-        .withSuccessHandler(res => {
+      callGasApi('updateWorkStatus', { rowId: rowId, newStatus: newStatus, pin: pin })
+        .then(res => {
           selectEl.disabled = false;
           if (res.status === 'success') {
             if (target) {
@@ -2027,12 +2041,11 @@
             Swal.fire({ icon: 'error', title: 'รหัสผ่านไม่ถูกต้อง', text: res.message });
           }
         })
-        .withFailureHandler(err => {
+        .catch(err => {
           selectEl.disabled = false;
           selectEl.value = oldStatus;
-          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.toString() });
-        })
-        .updateWorkStatus({ rowId: rowId, newStatus: newStatus, pin: pin });
+          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
+        });
     }
 
     function openImageModalByIndex(idx) {
@@ -2089,8 +2102,13 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังสร้าง PDF...';
 
-      google.script.run
-        .withSuccessHandler(res => {
+      callGasApi('generateSummaryPdf', {
+          buildingId: buildingId,
+          buildingName: buildingName,
+          year: year,
+          month: month
+        })
+        .then(res => {
           btn.disabled = false;
           btn.innerHTML = '<i class="fa-solid fa-download me-1"></i> สร้างไฟล์ PDF';
 
@@ -2105,7 +2123,6 @@
             const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
             const blobUrl = URL.createObjectURL(blob);
 
-            // สั่งดาวน์โหลดอัตโนมัติ
             const a = document.createElement('a');
             a.href = blobUrl;
             a.download = res.fileName || 'รายงานสรุปงานช่าง.pdf';
@@ -2113,7 +2130,6 @@
             a.click();
             document.body.removeChild(a);
 
-            // แสดงปุ่มเปิดดูซ้ำสำหรับมือถือ iOS / LINE
             Swal.fire({
               icon: 'success',
               title: 'สร้างไฟล์ PDF เรียบร้อยแล้ว',
@@ -2129,16 +2145,10 @@
             Swal.fire({ icon: 'error', title: 'สร้าง PDF ไม่สำเร็จ', text: res.message || 'ไม่พบข้อมูล' });
           }
         })
-        .withFailureHandler(err => {
+        .catch(err => {
           btn.disabled = false;
           btn.innerHTML = '<i class="fa-solid fa-download me-1"></i> สร้างไฟล์ PDF';
-          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.toString() });
-        })
-        .generateSummaryPdf({
-          buildingId: buildingId,
-          buildingName: buildingName,
-          year: year,
-          month: month
+          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
         });
     }
   </script>
