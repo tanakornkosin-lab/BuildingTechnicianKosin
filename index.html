@@ -515,6 +515,64 @@
       font-size: 0.82rem;
     }
 
+    /* Multi-image gallery preview */
+    .multi-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .multi-thumb-wrap {
+      position: relative;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      aspect-ratio: 1 / 1;
+      background: #f1f5f9;
+    }
+
+    .multi-thumb-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .btn-remove-thumb {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(15, 23, 42, 0.8);
+      color: #ffffff;
+      font-size: 0.72rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .thumb-wrap-badge {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .thumb-count-badge {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      background: rgba(15, 23, 42, 0.82);
+      color: #ffffff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 8px;
+    }
+
     /* Form Controls */
     .form-label {
       font-size: 0.88rem;
@@ -861,27 +919,26 @@
             </div>
           </div>
 
-          <!-- ขั้นตอนที่ 2: ถ่ายรูปหน้างาน -->
+          <!-- ขั้นตอนที่ 2: ถ่ายรูปหน้างาน (หลายภาพ หรือ ไม่ใส่ภาพก็ได้) -->
           <div class="step-card">
             <div class="step-header">
               <span class="step-badge">2</span>
-              <span>ขั้นตอนที่ 2 : ถ่ายรูปหน้างาน / เลือกรูปจากเครื่อง</span>
+              <span>ขั้นตอนที่ 2 : รูปหน้างาน (ใส่หลายรูปได้ / ไม่บังคับ)</span>
             </div>
 
             <div class="camera-box" id="cameraBox" onclick="triggerCamera()">
               <i class="fa-solid fa-camera camera-icon"></i>
-              <div class="fw-bold">กดที่นี่เพื่อ "ถ่ายรูป" หรือเลือกรูปภาพ</div>
-              <small class="text-muted">รองรับทั้งถ่ายสดจากกล้องและเลือกภาพที่ถ่ายเก็บไว้</small>
-              <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="handlePhotoSelected(event)">
+              <div class="fw-bold">กดเพื่อ "ถ่ายรูป" หรือ "เลือกหลายรูป"</div>
+              <small class="text-muted">สามารถข้ามขั้นตอนนี้ได้หากไม่มีรูปภาพ</small>
+              <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" onchange="handlePhotoSelected(event)">
             </div>
 
-            <div class="preview-container" id="previewContainer">
-              <img id="imagePreview" src="" alt="ภาพหน้างาน">
-              <button type="button" class="btn-retake" onclick="triggerCamera()">
-                <i class="fa-solid fa-arrows-rotate me-1"></i> เปลี่ยนรูป
+            <div id="multiPreviewGrid" class="multi-preview-grid" style="display: none;"></div>
+            <div id="addMorePhotoBar" class="mt-2 text-end" style="display: none;">
+              <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="triggerCamera()">
+                <i class="fa-solid fa-plus me-1"></i> เพิ่มรูปอีก
               </button>
             </div>
-            <input type="hidden" id="imageBase64">
           </div>
 
           <!-- ขั้นตอนที่ 3: ลงรายละเอียด -->
@@ -1134,7 +1191,7 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body text-center p-3">
-          <img id="modalFullImage" src="" class="modal-img-full" alt="ภาพขยาย">
+          <div id="modalImagesContainer" class="d-flex flex-column gap-2"></div>
           <div class="mt-2 text-start small text-muted" id="modalImageDesc"></div>
         </div>
       </div>
@@ -1203,7 +1260,7 @@
 
   <script>
     // === ตั้งค่าลิงก์ Google Apps Script Web App (/exec) ===
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyWYLGn1k11j-3I0inqe6OkQLpqHsscpLDleVmUY7hiMKkQy2O7kyNDQyE7obD-iHgZjg/exec";
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyWYLGn1k11j-3I0inqe6OkQLpqHsscpLDleVmUY7hiMKkQy207kyNDQyE7obD-iHgZjg/exec";
 
     async function callGasApi(action, payload) {
       if (!GAS_API_URL) {
@@ -1221,6 +1278,7 @@
     }
 
     let buildingsList = [];
+    let selectedImages = [];
     let selectedBuilding = null;
     let selectedDateFilter = 'ALL'; // 'ALL' หรือ 'yyyy-MM-dd'
     let calYear = new Date().getFullYear();
@@ -1553,22 +1611,63 @@
     }
 
     function handlePhotoSelected(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+      const files = Array.from(event.target.files || []);
+      if (files.length === 0) return;
 
       Swal.fire({
-        title: 'กำลังเตรียมรูปภาพ...',
+        title: `กำลังเตรียมรูปภาพ (${files.length} รูป)...`,
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading()
       });
 
-      compressImageFile(file, 1280, function(compressedBase64) {
-        document.getElementById('imagePreview').src = compressedBase64;
-        document.getElementById('imageBase64').value = compressedBase64;
-        document.getElementById('cameraBox').style.display = 'none';
-        document.getElementById('previewContainer').style.display = 'block';
-        Swal.close();
+      let processed = 0;
+      files.forEach(file => {
+        compressImageFile(file, 1280, function(compressedBase64) {
+          selectedImages.push(compressedBase64);
+          processed++;
+          if (processed === files.length) {
+            event.target.value = '';
+            renderSelectedImages();
+            Swal.close();
+          }
+        });
       });
+    }
+
+    function renderSelectedImages() {
+      const grid = document.getElementById('multiPreviewGrid');
+      const addMoreBar = document.getElementById('addMorePhotoBar');
+      const cameraBox = document.getElementById('cameraBox');
+
+      if (selectedImages.length === 0) {
+        grid.style.display = 'none';
+        grid.innerHTML = '';
+        addMoreBar.style.display = 'none';
+        cameraBox.style.display = 'block';
+        return;
+      }
+
+      cameraBox.style.display = 'none';
+      grid.style.display = 'grid';
+      addMoreBar.style.display = 'block';
+
+      let html = '';
+      selectedImages.forEach((b64, idx) => {
+        html += `
+          <div class="multi-thumb-wrap">
+            <img src="${b64}" alt="รูปที่ ${idx + 1}">
+            <button type="button" class="btn-remove-thumb" onclick="removeSelectedImage(${idx})">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        `;
+      });
+      grid.innerHTML = html;
+    }
+
+    function removeSelectedImage(idx) {
+      selectedImages.splice(idx, 1);
+      renderSelectedImages();
     }
 
     function handleFormSubmit(event) {
@@ -1589,16 +1688,7 @@
         return;
       }
 
-      const imageBase64 = document.getElementById('imageBase64').value;
-      if (!imageBase64) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'กรุณาถ่ายรูปหน้างาน',
-          text: 'จำเป็นต้องมีภาพถ่ายประกอบความคืบหน้า',
-          confirmButtonColor: '#0284c7'
-        });
-        return;
-      }
+
 
       const contractorType = document.getElementById('contractorType').value;
       const contractorName = document.getElementById('contractorName').value.trim();
@@ -1613,7 +1703,7 @@
         isBackdate: isBackdate,
         customDate: customDate,
         customTime: customTime,
-        imageBase64: imageBase64,
+        imagesBase64: selectedImages,
         buildingId: selectedBuilding.id,
         buildingName: selectedBuilding.name,
         floor: document.getElementById('floor').value,
@@ -1646,10 +1736,8 @@
               document.getElementById('taskForm').reset();
               document.getElementById('contractorNameBox').style.display = 'none';
               document.getElementById('contractorName').required = false;
-              document.getElementById('imageBase64').value = '';
-              document.getElementById('imagePreview').src = '';
-              document.getElementById('cameraBox').style.display = 'block';
-              document.getElementById('previewContainer').style.display = 'none';
+              selectedImages = [];
+              renderSelectedImages();
 
               const now = new Date();
               document.getElementById('customDate').value = now.toISOString().split('T')[0];
@@ -1937,10 +2025,19 @@
       let html = '';
       logs.forEach(log => {
         const origIdx = allLogs.indexOf(log);
-        const safeLogImg = log.imageUrl || FALLBACK_LOG_SVG;
-        const imgTag = log.imageUrl
-          ? `<img src="${safeLogImg}" class="log-img-thumb" onclick="openImageModalByIndex(${origIdx})" alt="รูปหน้างาน" onerror="this.onerror=null; this.src=FALLBACK_LOG_SVG;">`
-          : `<div class="log-img-thumb d-flex align-items-center justify-content-center bg-light text-muted small">ไม่มีรูป</div>`;
+        const imgs = (log.images && log.images.length > 0) ? log.images : (log.imageUrl ? [log.imageUrl] : []);
+        let imgTag = '';
+        if (imgs.length > 0) {
+          const extraBadge = imgs.length > 1 ? `<span class="thumb-count-badge">+${imgs.length - 1} รูป</span>` : '';
+          imgTag = `
+            <div class="thumb-wrap-badge" onclick="openImageModalByIndex(${origIdx})" style="cursor:pointer;">
+              <img src="${imgs[0]}" class="log-img-thumb" alt="รูปหน้างาน" onerror="this.onerror=null; this.src=FALLBACK_LOG_SVG;">
+              ${extraBadge}
+            </div>
+          `;
+        } else {
+          imgTag = `<div class="log-img-thumb d-flex align-items-center justify-content-center bg-light text-muted small">ไม่มีรูป</div>`;
+        }
 
         const currentStatus = log.workStatus || 'กำลังดำเนินการ';
         const statusBadge = getStatusBadgeHtml(currentStatus);
@@ -2050,9 +2147,16 @@
 
     function openImageModalByIndex(idx) {
       const log = (window._currentLogsCache || [])[idx];
-      if (!log || !log.imageUrl) return;
-      document.getElementById('modalFullImage').src = log.imageUrl;
-      document.getElementById('modalImageTitle').innerText = `${log.buildingName} (${log.floor})`;
+      if (!log) return;
+      const imgs = (log.images && log.images.length > 0) ? log.images : (log.imageUrl ? [log.imageUrl] : []);
+      if (imgs.length === 0) return;
+
+      const container = document.getElementById('modalImagesContainer');
+      container.innerHTML = imgs.map((src, i) => `
+        <img src="${src}" class="modal-img-full" alt="ภาพที่ ${i + 1}" onerror="this.onerror=null; this.src=FALLBACK_LOG_SVG;">
+      `).join('');
+
+      document.getElementById('modalImageTitle').innerText = `${log.buildingName} (${log.floor}) - ${imgs.length} รูป`;
       document.getElementById('modalImageDesc').innerText = `${log.date} ${log.time} น. - ${log.details}`;
       new bootstrap.Modal(document.getElementById('imageModal')).show();
     }
