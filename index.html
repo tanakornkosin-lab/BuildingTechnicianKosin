@@ -1206,7 +1206,7 @@
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyWYLGn1k11j-3I0inqe6OkQLpqHsscpLDleVmUY7hiMKkQy2O7kyNDQyE7obD-iHgZjg/exec";
 
     async function callGasApi(action, payload) {
-      if (!GAS_API_URL || GAS_API_URL === "https://script.google.com/macros/s/AKfycbyWYLGn1k11j-3I0inqe6OkQLpqHsscpLDleVmUY7hiMKkQy2O7kyNDQyE7obD-iHgZjg/exec") {
+      if (!GAS_API_URL || GAS_API_URL.includes("https://script.google.com/macros/s/AKfycbyWYLGn1k11j-3I0inqe6OkQLpqHsscpLDleVmUY7hiMKkQy2O7kyNDQyE7obD-iHgZjg/exec")) {
         throw new Error("กรุณาใส่ลิงก์ Google Apps Script Web App ในตัวแปร GAS_API_URL ก่อนใช้งาน");
       }
       const response = await fetch(GAS_API_URL, {
