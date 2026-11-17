@@ -1263,14 +1263,26 @@
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyWYLGn1k11j-3I0inqe6OkQLpqHsscpLDleVmUY7hiMKkQy207kyNDQyE7obD-iHgZjg/exec";
 
     async function callGasApi(action, payload) {
-      if (!GAS_API_URL) {
+      if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
         throw new Error("กรุณาใส่ลิงก์ Google Apps Script Web App ในตัวแปร GAS_API_URL ก่อนใช้งาน");
       }
-      const response = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: action, payload: payload || {} })
-      });
+
+      let response;
+      if (action === "getBuildingsData" || action === "getWorkLogs") {
+        const params = new URLSearchParams({ action: action, ...(payload || {}) });
+        response = await fetch(`${GAS_API_URL}?${params.toString()}`, {
+          method: "GET",
+          redirect: "follow"
+        });
+      } else {
+        response = await fetch(GAS_API_URL, {
+          method: "POST",
+          redirect: "follow",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: action, payload: payload || {} })
+        });
+      }
+
       if (!response.ok) {
         throw new Error("HTTP Error: " + response.status);
       }
