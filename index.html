@@ -1,2272 +1,929 @@
-<!DOCTYPE html>
-<html lang="th">
+/**
+ * ระบบติดตามงานช่างอาคารและบันทึกความคืบหน้าหน้างาน (Multi-Building Edition)
+ * Google Apps Script (Code.gs)
+ */
+
+// === การตั้งค่าเบื้องต้น (CONFIGURATION) ===
+const FOLDER_ID = "1PWl1CflW_qMK9aSfJfcLt25skSplKLAs";
+const LOG_SHEET_NAME = "WorkLogs";
+const BUILDING_SHEET_NAME = "Buildings";
+const STATUS_PIN = "147"; // รหัสผ่านสำหรับเปลี่ยนสถานะงาน
+
+// อาคารเริ่มต้น 5 อาคาร
+const DEFAULT_BUILDINGS = [
+  {
+    id: "BLD_1",
+    name: "KOSIN",
+    imageUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "BLD_2",
+    name: "NAIL IT",
+    imageUrl: "https://images.unsplash.com/photo-1554469384-e58fac16e23a?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "BLD_3",
+    name: "ENDO",
+    imageUrl: "https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "BLD_4",
+    name: "SIAMWORK",
+    imageUrl: "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "BLD_5",
+    name: "GOOD WILL",
+    imageUrl: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=600&q=80"
+  }
+];
+
+/**
+ * ฟังก์ชันหลักสำหรับเปิด Web App
+ */
+function doGet(e) {
+  try {
+    initSheets();
+    const params = (e && e.parameter) ? e.parameter : {};
+    const action = params.action || "";
+
+    let result;
+    if (action === "getBuildingsData") {
+      result = getBuildingsData();
+    } else if (action === "getWorkLogs") {
+      result = getWorkLogs({
+        buildingId: params.buildingId || "ALL",
+        buildingName: params.buildingName || "",
+        date: params.date || "ALL"
+      });
+    } else {
+      result = { status: "success", message: "Building Tracker API is online" };
+    }
+
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: "API GET Error: " + error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    const req = JSON.parse(e.postData.contents || "{}");
+    const action = req.action || "";
+    const payload = req.payload || {};
+    let result;
+
+    switch (action) {
+      case "getBuildingsData":
+        result = getBuildingsData();
+        break;
+      case "saveBuildingInfo":
+        result = saveBuildingInfo(payload);
+        break;
+      case "saveWorkLog":
+        result = saveWorkLog(payload);
+        break;
+      case "getWorkLogs":
+        result = getWorkLogs(payload);
+        break;
+      case "updateWorkStatus":
+        result = updateWorkStatus(payload);
+        break;
+      case "generateSummaryPdf":
+        result = generateSummaryPdf(payload);
+        break;
+      default:
+        result = { status: "error", message: "Unknown action: " + action };
+    }
+
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: "API Error: " + error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * สร้างหรือตรวจสอบชีต WorkLogs และชีต Buildings อัตโนมัติ
+ */
+function initSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. ตรวจสอบชีตบันทึกงาน (WorkLogs)
+  let logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+  if (!logSheet) {
+    logSheet = ss.insertSheet(LOG_SHEET_NAME);
+    const headers = [
+      "Timestamp",
+      "วันที่",
+      "เวลา",
+      "รหัสอาคาร",
+      "ชื่ออาคาร",
+      "ชั้น",
+      "ประเภทงาน",
+      "ผู้รับเหมา",
+      "รายละเอียดงาน",
+      "ลิงก์รูปภาพ",
+      "File ID",
+      "สถานะ",
+      "อัปเดตสถานะล่าสุด",
+      "ชื่อผู้ฝากงาน"
+    ];
+    logSheet.appendRow(headers);
+    logSheet.getRange(1, 1, 1, headers.length)
+      .setBackground("#0f172a")
+      .setFontColor("#ffffff")
+      .setFontWeight("bold")
+      .setHorizontalAlignment("center");
+    logSheet.setFrozenRows(1);
+  } else {
+    if (logSheet.getLastColumn() < 12) {
+      logSheet.getRange(1, 12).setValue("สถานะ")
+        .setBackground("#0f172a").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
+    }
+    if (logSheet.getLastColumn() < 13) {
+      logSheet.getRange(1, 13).setValue("อัปเดตสถานะล่าสุด")
+        .setBackground("#0f172a").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
+    }
+    if (logSheet.getLastColumn() < 14) {
+      logSheet.getRange(1, 14).setValue("ชื่อผู้ฝากงาน")
+        .setBackground("#0f172a").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
+    }
+  }
+
+  // 2. ตรวจสอบชีตข้อมูลอาคาร (Buildings)
+  let bldSheet = ss.getSheetByName(BUILDING_SHEET_NAME);
+  if (!bldSheet) {
+    bldSheet = ss.insertSheet(BUILDING_SHEET_NAME);
+    const bldHeaders = ["Building ID", "ชื่ออาคาร", "รูปภาพอาคาร (URL)", "อัปเดตล่าสุด"];
+    bldSheet.appendRow(bldHeaders);
+    bldSheet.getRange(1, 1, 1, bldHeaders.length)
+      .setBackground("#0284c7")
+      .setFontColor("#ffffff")
+      .setFontWeight("bold")
+      .setHorizontalAlignment("center");
+    bldSheet.setFrozenRows(1);
+
+    const now = new Date();
+    DEFAULT_BUILDINGS.forEach(b => {
+      bldSheet.appendRow([b.id, b.name, b.imageUrl, now]);
+    });
+  }
+}
+
+/**
+ * Helper: ดึงโฟลเดอร์สำหรับบันทึกรูปภาพ
+ */
+function getTargetFolder() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (FOLDER_ID && FOLDER_ID !== "YOUR_GOOGLE_DRIVE_FOLDER_ID_HERE") {
+    try {
+      return DriveApp.getFolderById(FOLDER_ID);
+    } catch (e) {}
+  }
+  const file = DriveApp.getFileById(ss.getId());
+  const parents = file.getParents();
+  return parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+}
+
+/**
+ * Helper: อัปโหลด Base64 Image ลง Google Drive
+ */
+function uploadBase64Image(base64String, fileNamePrefix) {
+  const folder = getTargetFolder();
+  const parts = base64String.split(",");
+  const contentType = parts[0].split(";")[0].replace("data:", "");
+  const base64Data = parts[1];
+  const decodedBlob = Utilities.newBlob(Utilities.base64Decode(base64Data), contentType);
+
+  const timeZone = Session.getScriptTimeZone() || "Asia/Bangkok";
+  const stamp = Utilities.formatDate(new Date(), timeZone, "yyyyMMdd_HHmmss");
+  decodedBlob.setName(`${fileNamePrefix}_${stamp}.jpg`);
+
+  const createdFile = folder.createFile(decodedBlob);
+  createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  const fileId = createdFile.getId();
+  const directImageUrl = `https://drive.google.com/thumbnail?id=${fileId}&sz=w1000`;
+
+  return {
+    fileId: fileId,
+    fileUrl: directImageUrl,
+    viewUrl: createdFile.getUrl()
+  };
+}
+
+/**
+ * Helper: แปลงรูปภาพจาก Google Drive เป็น Base64 Data URI
+ */
+function resolveImageForClient(fileIdOrUrl) {
+  if (!fileIdOrUrl) return "";
+  const str = String(fileIdOrUrl).trim();
+  if (str.indexOf("data:") === 0) return str;
+
+  let fileId = "";
+  if (str.indexOf("http") === -1) {
+    fileId = str;
+  } else if (str.indexOf("drive.google.com") !== -1) {
+    const matchId = str.match(/[?&]id=([a-zA-Z0-9_-]+)/) || str.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (matchId && matchId[1]) {
+      fileId = matchId[1];
+    }
+  }
+
+  if (!fileId) return str;
+
+  try {
+    const file = DriveApp.getFileById(fileId);
+    const blob = file.getBlob();
+    const contentType = blob.getContentType() || "image/jpeg";
+    const base64 = Utilities.base64Encode(blob.getBytes());
+    return `data:${contentType};base64,${base64}`;
+  } catch (e) {
+    return str;
+  }
+}
+
+/**
+ * ดึงรายชื่ออาคารทั้งหมดพร้อมจำนวนงานของวันนี้
+ */
+function getBuildingsData() {
+  try {
+    initSheets();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const bldSheet = ss.getSheetByName(BUILDING_SHEET_NAME);
+    const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+
+    const bldLastRow = bldSheet.getLastRow();
+    const buildings = [];
+
+    if (bldLastRow > 1) {
+      const bldData = bldSheet.getRange(2, 1, bldLastRow - 1, 3).getValues();
+      bldData.forEach(row => {
+        if (row[0]) {
+          const rawUrl = String(row[2] || "");
+          buildings.push({
+            id: String(row[0]),
+            name: String(row[1] || "ไม่ระบุชื่อ"),
+            imageUrl: resolveImageForClient(rawUrl),
+            rawImageUrl: rawUrl,
+            todayCount: 0,
+            totalCount: 0
+          });
+        }
+      });
+    }
+
+    const timeZone = Session.getScriptTimeZone() || "Asia/Bangkok";
+    const todayStr = Utilities.formatDate(new Date(), timeZone, "yyyy-MM-dd");
+    const logLastRow = logSheet.getLastRow();
+
+    if (logLastRow > 1) {
+      const logData = logSheet.getRange(2, 1, logLastRow - 1, 5).getValues();
+      logData.forEach(row => {
+        let rowDate = row[1];
+        if (rowDate instanceof Date) {
+          rowDate = Utilities.formatDate(rowDate, timeZone, "yyyy-MM-dd");
+        } else {
+          rowDate = String(rowDate).trim();
+        }
+        const bId = String(row[3] || "");
+        const bName = String(row[4] || "");
+
+        const targetBld = buildings.find(b => b.id === bId || b.name === bName);
+        if (targetBld) {
+          targetBld.totalCount += 1;
+          if (rowDate === todayStr) {
+            targetBld.todayCount += 1;
+          }
+        }
+      });
+    }
+
+    return {
+      status: "success",
+      buildings: buildings
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: error.toString(),
+      buildings: []
+    };
+  }
+}
+
+/**
+ * แก้ไขชื่ออาคารและ/หรือรูปภาพอาคาร (หรือเพิ่มอาคารใหม่)
+ */
+function saveBuildingInfo(payload) {
+  try {
+    initSheets();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const bldSheet = ss.getSheetByName(BUILDING_SHEET_NAME);
+    const logSheet = ss.getSheetByName(LOG_SHEET_NAME);
+
+    let imageUrl = payload.imageUrl || "";
+    if (payload.newImageBase64) {
+      const uploaded = uploadBase64Image(payload.newImageBase64, `Building_${payload.name}`);
+      imageUrl = uploaded.fileUrl;
+    }
+
+    const lastRow = bldSheet.getLastRow();
+    let foundRow = -1;
+    let oldName = "";
+
+    if (lastRow > 1 && payload.id) {
+      const ids = bldSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+      for (let i = 0; i < ids.length; i++) {
+        if (String(ids[i][0]) === String(payload.id)) {
+          foundRow = i + 2;
+          oldName = String(ids[i][1]);
+          break;
+        }
+      }
+    }
+
+    const now = new Date();
+    if (foundRow !== -1) {
+      bldSheet.getRange(foundRow, 2).setValue(payload.name);
+      if (imageUrl) {
+        bldSheet.getRange(foundRow, 3).setValue(imageUrl);
+      }
+      bldSheet.getRange(foundRow, 4).setValue(now);
+
+      const logLastRow = logSheet.getLastRow();
+      if (logLastRow > 1 && oldName !== payload.name) {
+        const logRange = logSheet.getRange(2, 4, logLastRow - 1, 2);
+        const logVals = logRange.getValues();
+        let changed = false;
+        for (let j = 0; j < logVals.length; j++) {
+          if (String(logVals[j][0]) === String(payload.id) || String(logVals[j][1]) === oldName) {
+            logVals[j][0] = payload.id;
+            logVals[j][1] = payload.name;
+            changed = true;
+          }
+        }
+        if (changed) {
+          logRange.setValues(logVals);
+        }
+      }
+    } else {
+      const newId = "BLD_" + new Date().getTime();
+      const defaultImg = imageUrl || "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80";
+      bldSheet.appendRow([newId, payload.name, defaultImg, now]);
+    }
+
+    return getBuildingsData();
+  } catch (error) {
+    return {
+      status: "error",
+      message: "ไม่สามารถบันทึกข้อมูลอาคารได้: " + error.toString()
+    };
+  }
+}
+
+/**
+ * บันทึกข้อมูลงานหน้างาน (งานใหม่เริ่มต้นที่สถานะ "รอดำเนินการ" เสมอ)
+ */
+function saveWorkLog(form) {
+  try {
+    initSheets();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(LOG_SHEET_NAME);
+
+    const now = new Date();
+    const timeZone = Session.getScriptTimeZone() || "Asia/Bangkok";
+
+    let dateFormatted = Utilities.formatDate(now, timeZone, "yyyy-MM-dd");
+    let timeFormatted = Utilities.formatDate(now, timeZone, "HH:mm");
+
+    if (form.isBackdate && form.customDate) {
+      dateFormatted = String(form.customDate).trim();
+      if (form.customTime) {
+        timeFormatted = String(form.customTime).trim();
+      }
+    }
+
+    const imagesInput = Array.isArray(form.imagesBase64)
+      ? form.imagesBase64
+      : (form.imageBase64 ? [form.imageBase64] : []);
+
+    const fileUrls = [];
+    const fileIds = [];
+
+    for (let k = 0; k < imagesInput.length; k++) {
+      if (imagesInput[k]) {
+        const uploaded = uploadBase64Image(imagesInput[k], `Job_${form.buildingName}_${dateFormatted}_${k + 1}`);
+        fileUrls.push(uploaded.fileUrl);
+        fileIds.push(uploaded.fileId);
+      }
+    }
+
+    const fileUrl = fileUrls.join(",");
+    const fileId = fileIds.join(",");
+
+    const workStatus = form.workStatus || "รอดำเนินการ";
+
+    sheet.appendRow([
+      now,
+      dateFormatted,
+      timeFormatted,
+      form.buildingId || "",
+      form.buildingName || "",
+      form.floor || "",
+      form.workType || "",
+      form.contractor || "",
+      form.details || "",
+      fileUrl,
+      fileId,
+      workStatus,
+      now,
+      form.requesterName || ""
+    ]);
+
+    return {
+      status: "success",
+      message: "บันทึกข้อมูลงานเรียบร้อยแล้ว",
+      date: dateFormatted
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: "เกิดข้อผิดพลาดในการบันทึก: " + error.toString()
+    };
+  }
+}
+
+/**
+ * อัปเดตสถานะของงานที่บันทึกไปแล้ว
+ */
+function updateWorkStatus(payload) {
+  try {
+    if (String(payload.pin || "").trim() !== STATUS_PIN) {
+      return { status: "error", message: "รหัสผ่านไม่ถูกต้อง ไม่สามารถเปลี่ยนสถานะได้" };
+    }
+    initSheets();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(LOG_SHEET_NAME);
+
+    const rowId = Number(payload.rowId);
+    const newStatus = String(payload.newStatus || "").trim();
+
+    if (!rowId || rowId < 2 || !newStatus) {
+      return { status: "error", message: "ข้อมูลไม่ถูกต้อง" };
+    }
+
+    const now = new Date();
+    const timeZone = Session.getScriptTimeZone() || "Asia/Bangkok";
+    const updatedStr = Utilities.formatDate(now, timeZone, "yyyy-MM-dd HH:mm");
+
+    sheet.getRange(rowId, 12).setValue(newStatus);
+    sheet.getRange(rowId, 13).setValue(now);
+
+    return {
+      status: "success",
+      rowId: rowId,
+      newStatus: newStatus,
+      updatedAt: updatedStr
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: "อัปเดตสถานะไม่สำเร็จ: " + error.toString()
+    };
+  }
+}
+
+/**
+ * ดึงรายการงานย้อนหลังตามอาคาร และวันที่
+ */
+function getWorkLogs(filter) {
+  try {
+    initSheets();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(LOG_SHEET_NAME);
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) {
+      return { status: "success", logs: [] };
+    }
+
+    const numCols = Math.max(sheet.getLastColumn(), 14);
+    const data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
+    const timeZone = Session.getScriptTimeZone() || "Asia/Bangkok";
+
+    const targetBuildingId = filter && filter.buildingId ? String(filter.buildingId).trim() : "";
+    const targetBuildingName = filter && filter.buildingName ? String(filter.buildingName).trim() : "";
+    const targetDate = filter && filter.date ? String(filter.date).trim() : "";
+
+    const filteredLogs = [];
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      let rowDate = row[1];
+      if (rowDate instanceof Date) {
+        rowDate = Utilities.formatDate(rowDate, timeZone, "yyyy-MM-dd");
+      } else {
+        rowDate = String(rowDate || "").trim();
+      }
+
+      let timeStr = row[2];
+      if (timeStr instanceof Date) {
+        timeStr = Utilities.formatDate(timeStr, timeZone, "HH:mm");
+      } else {
+        timeStr = String(timeStr || "-");
+      }
+
+      const rowBldId = String(row[3] || "").trim();
+      const rowBldName = String(row[4] || "").trim();
+      const floor = String(row[5] || "-");
+      const workType = String(row[6] || "-");
+      const contractor = String(row[7] || "-");
+      const details = String(row[8] || "-");
+      const rawImageUrl = String(row[9] || "");
+      const fileId = String(row[10] || "");
+      const workStatus = String(row[11] || "รอดำเนินการ").trim();
+
+      let statusUpdatedAt = "";
+      if (row[12] instanceof Date) {
+        statusUpdatedAt = Utilities.formatDate(row[12], timeZone, "yyyy-MM-dd HH:mm");
+      } else if (row[12]) {
+        statusUpdatedAt = String(row[12]);
+      }
+
+      let matchBuilding = true;
+      if (targetBuildingId && targetBuildingId !== "ALL") {
+        matchBuilding = (rowBldId === targetBuildingId) || (rowBldName === targetBuildingName);
+      }
+
+      let matchDate = true;
+      if (targetDate && targetDate !== "ALL") {
+        matchDate = (rowDate === targetDate);
+      }
+
+      if (matchBuilding && matchDate) {
+        filteredLogs.push({
+          rowId: i + 2,
+          date: rowDate,
+          time: timeStr,
+          buildingId: rowBldId,
+          buildingName: rowBldName,
+          floor: floor,
+          workType: workType,
+          contractor: contractor,
+          details: details,
+          images: (function() {
+            const rawList = (fileId || rawImageUrl || "").split(",").map(s => s.trim()).filter(Boolean);
+            return rawList.map(item => resolveImageForClient(item)).filter(Boolean);
+          })(),
+          imageUrl: (function() {
+            const rawList = (fileId || rawImageUrl || "").split(",").map(s => s.trim()).filter(Boolean);
+            return rawList.length > 0 ? resolveImageForClient(rawList[0]) : "";
+          })(),
+          fileId: fileId,
+          workStatus: workStatus,
+          statusUpdatedAt: statusUpdatedAt,
+          requesterName: String(row[13] || "").trim()
+        });
+      }
+    }
+
+    filteredLogs.reverse();
+
+    return {
+      status: "success",
+      logs: filteredLogs
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: "ไม่สามารถดึงข้อมูลได้: " + error.toString(),
+      logs: []
+    };
+  }
+}
+
+
+/**
+ * สร้างรายงานสรุปยอดงานรายเดือน / รายปี และรายการงานทั้งหมดเป็นไฟล์ PDF (Base64)
+ */
+function generateSummaryPdf(options) {
+  try {
+    initSheets();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(LOG_SHEET_NAME);
+    const timeZone = Session.getScriptTimeZone() || "Asia/Bangkok";
+
+    const targetBuildingId = options && options.buildingId ? String(options.buildingId).trim() : "ALL";
+    const targetBuildingName = options && options.buildingName ? String(options.buildingName).trim() : "ทุกอาคาร";
+    const targetYear = options && options.year ? String(options.year).trim() : "ALL";   // เช่น "2026" หรือ "ALL"
+    const targetMonth = options && options.month ? String(options.month).trim() : "ALL"; // เช่น "01".."12" หรือ "ALL"
+
+    const lastRow = sheet.getLastRow();
+    const logs = [];
+
+    if (lastRow > 1) {
+      const numCols = Math.max(sheet.getLastColumn(), 14);
+      const data = sheet.getRange(2, 1, lastRow - 1, numCols).getValues();
+
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        let rowDate = row[1];
+        if (rowDate instanceof Date) {
+          rowDate = Utilities.formatDate(rowDate, timeZone, "yyyy-MM-dd");
+        } else {
+          rowDate = String(rowDate || "").trim();
+        }
+        if (!rowDate || rowDate.length < 7) continue;
+
+        let timeStr = row[2];
+        if (timeStr instanceof Date) {
+          timeStr = Utilities.formatDate(timeStr, timeZone, "HH:mm");
+        } else {
+          timeStr = String(timeStr || "-");
+        }
+
+        const rowBldId = String(row[3] || "").trim();
+        const rowBldName = String(row[4] || "-").trim();
+        const floor = String(row[5] || "-");
+        const workType = String(row[6] || "-");
+        const contractor = String(row[7] || "-");
+        const details = String(row[8] || "-");
+        const workStatus = String(row[11] || "รอดำเนินการ").trim();
+        const requesterName = String(row[13] || "").trim();
+
+        const parts = rowDate.split("-");
+        const y = parts[0] || "";
+        const m = parts[1] || "";
+
+        if (targetBuildingId !== "ALL" && rowBldId !== targetBuildingId && rowBldName !== targetBuildingName) {
+          continue;
+        }
+        if (targetYear !== "ALL" && y !== targetYear) {
+          continue;
+        }
+        if (targetMonth !== "ALL" && m !== targetMonth) {
+          continue;
+        }
+
+        logs.push({
+          date: rowDate,
+          year: y,
+          month: m,
+          time: timeStr,
+          buildingName: rowBldName,
+          floor: floor,
+          workType: workType,
+          contractor: contractor,
+          details: details,
+          workStatus: workStatus,
+          requesterName: requesterName
+        });
+      }
+    }
+
+    // เรียงตามวันที่เก่าไปใหม่สำหรับการอ่านรายงาน
+    logs.sort((a, b) => (a.date + " " + a.time).localeCompare(b.date + " " + b.time));
+
+    const thaiMonths = {
+      "01": "มกราคม", "02": "กุมภาพันธ์", "03": "มีนาคม", "04": "เมษายน",
+      "05": "พฤษภาคม", "06": "มิถุนายน", "07": "กรกฎาคม", "08": "สิงหาคม",
+      "09": "กันยายน", "10": "ตุลาคม", "11": "พฤศจิกายน", "12": "ธันวาคม"
+    };
+
+    // สรุปยอดรวมทั้งหมด
+    let totalCount = logs.length;
+    let pendingCount = 0;
+    let inProgressCount = 0;
+    let doneCount = 0;
+
+    // สรุปรายปี & รายเดือน (Key: "YYYY" และ "YYYY-MM")
+    const yearMap = {};
+    const monthMap = {};
+    const typeMap = {};
+
+    logs.forEach(l => {
+      if (l.workStatus === "รอดำเนินการ") pendingCount++;
+      else if (l.workStatus === "ดำเนินการเสร็จสิ้น") doneCount++;
+      else inProgressCount++;
+
+      // รายปี
+      if (!yearMap[l.year]) yearMap[l.year] = { total: 0, pending: 0, inProgress: 0, done: 0 };
+      yearMap[l.year].total++;
+      if (l.workStatus === "รอดำเนินการ") yearMap[l.year].pending++;
+      else if (l.workStatus === "ดำเนินการเสร็จสิ้น") yearMap[l.year].done++;
+      else yearMap[l.year].inProgress++;
+
+      // รายเดือน
+      const ym = l.year + "-" + l.month;
+      if (!monthMap[ym]) monthMap[ym] = { year: l.year, month: l.month, total: 0, pending: 0, inProgress: 0, done: 0 };
+      monthMap[ym].total++;
+      if (l.workStatus === "รอดำเนินการ") monthMap[ym].pending++;
+      else if (l.workStatus === "ดำเนินการเสร็จสิ้น") monthMap[ym].done++;
+      else monthMap[ym].inProgress++;
+
+      // ประเภทงาน
+      typeMap[l.workType] = (typeMap[l.workType] || 0) + 1;
+    });
+
+    function esc(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    const printedAt = Utilities.formatDate(new Date(), timeZone, "yyyy-MM-dd HH:mm");
+    const periodLabel = (targetYear === "ALL" ? "ทุกปี" : "ปี " + (Number(targetYear) + 543) + " (" + targetYear + ")") +
+      " / " + (targetMonth === "ALL" ? "ทุกเดือน" : "เดือน" + (thaiMonths[targetMonth] || targetMonth));
+
+    // สร้างแถวสรุปรายปี
+    let yearRowsHtml = "";
+    Object.keys(yearMap).sort().forEach(y => {
+      const s = yearMap[y];
+      const beYear = Number(y) + 543;
+      yearRowsHtml += `<tr>
+        <td style="text-align:center;">พ.ศ. ${beYear} (${esc(y)})</td>
+        <td style="text-align:center;font-weight:bold;">${s.total}</td>
+        <td style="text-align:center;color:#b45309;">${s.pending}</td>
+        <td style="text-align:center;color:#0369a1;">${s.inProgress}</td>
+        <td style="text-align:center;color:#15803d;font-weight:bold;">${s.done}</td>
+      </tr>`;
+    });
+    if (!yearRowsHtml) {
+      yearRowsHtml = `<tr><td colspan="5" style="text-align:center;color:#64748b;">ไม่พบข้อมูล</td></tr>`;
+    }
+
+    // สร้างแถวสรุปรายเดือน
+    let monthRowsHtml = "";
+    Object.keys(monthMap).sort().forEach(ym => {
+      const s = monthMap[ym];
+      const beYear = Number(s.year) + 543;
+      const mName = thaiMonths[s.month] || s.month;
+      monthRowsHtml += `<tr>
+        <td>${esc(mName)} ${beYear}</td>
+        <td style="text-align:center;font-weight:bold;">${s.total}</td>
+        <td style="text-align:center;color:#b45309;">${s.pending}</td>
+        <td style="text-align:center;color:#0369a1;">${s.inProgress}</td>
+        <td style="text-align:center;color:#15803d;font-weight:bold;">${s.done}</td>
+      </tr>`;
+    });
+    if (!monthRowsHtml) {
+      monthRowsHtml = `<tr><td colspan="5" style="text-align:center;color:#64748b;">ไม่พบข้อมูล</td></tr>`;
+    }
+
+    // สร้างแถวสรุปตามประเภทงาน
+    let typeRowsHtml = "";
+    Object.entries(typeMap).sort((a, b) => b[1] - a[1]).forEach(([wt, cnt]) => {
+      typeRowsHtml += `<tr>
+        <td>${esc(wt)}</td>
+        <td style="text-align:center;font-weight:bold;">${cnt}</td>
+      </tr>`;
+    });
+    if (!typeRowsHtml) {
+      typeRowsHtml = `<tr><td colspan="2" style="text-align:center;color:#64748b;">ไม่พบข้อมูล</td></tr>`;
+    }
+
+    // สร้างตารางรายการงานทั้งหมด
+    let detailRowsHtml = "";
+    logs.forEach((l, idx) => {
+      let statusColor = "#0369a1";
+      if (l.workStatus === "รอดำเนินการ") statusColor = "#b45309";
+      else if (l.workStatus === "ดำเนินการเสร็จสิ้น") statusColor = "#15803d";
+
+      const people = (l.requesterName ? "ผู้ฝาก: " + esc(l.requesterName) + "<br/>" : "") +
+        "ผู้ทำ: " + esc(l.contractor);
+
+      detailRowsHtml += `<tr>
+        <td style="text-align:center;">${idx + 1}</td>
+        <td style="white-space:nowrap;">${esc(l.date)}<br/><span style="color:#64748b;">${esc(l.time)} น.</span></td>
+        <td>${esc(l.buildingName)}<br/><span style="color:#0369a1;">${esc(l.floor)}</span></td>
+        <td>${esc(l.workType)}</td>
+        <td>${esc(l.details)}</td>
+        <td>${people}</td>
+        <td style="text-align:center;font-weight:bold;color:${statusColor};">${esc(l.workStatus)}</td>
+      </tr>`;
+    });
+    if (!detailRowsHtml) {
+      detailRowsHtml = `<tr><td colspan="7" style="text-align:center;color:#64748b;">ไม่มีรายการงานในช่วงเวลาที่เลือก</td></tr>`;
+    }
+
+    const htmlReport = `<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ระบบติดตามงานช่างอาคาร</title>
-  <!-- Bootstrap 5 CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
+  <meta charset="UTF-8" />
   <style>
-    :root {
-      --primary-color: #0284c7;
-      --primary-dark: #0369a1;
-      --bg-color: #f1f5f9;
-      --card-bg: #ffffff;
-      --text-main: #0f172a;
-      --text-muted: #64748b;
-      --border-color: #e2e8f0;
-    }
-
-    * {
-      font-family: 'Sarabun', sans-serif;
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      padding-bottom: 90px;
-      margin: 0;
-    }
-
-    /* Header Bar */
-    .app-header {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      color: white;
-      padding: 14px 16px;
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12);
-    }
-
-    .app-header h1 {
-      font-size: 1.1rem;
-      font-weight: 600;
-      margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .app-header .sub-date {
-      font-size: 0.78rem;
-      color: #94a3b8;
-      margin-top: 2px;
-    }
-
-    .btn-back-home {
-      background: rgba(255, 255, 255, 0.14);
-      color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 10px;
-      padding: 6px 12px;
-      font-size: 0.85rem;
-      font-weight: 500;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      cursor: pointer;
-    }
-
-    .btn-back-home:active {
-      background: rgba(255, 255, 255, 0.25);
-    }
-
-    /* Building Cards (Home Screen) */
-    .building-card {
-      background: var(--card-bg);
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
-      cursor: pointer;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      margin-bottom: 16px;
-    }
-
-    .building-card:active {
-      transform: scale(0.985);
-    }
-
-    .building-img-wrap {
-      width: 100%;
-      height: 155px;
-      background-color: #cbd5e1;
-      overflow: hidden;
-    }
-
-    .building-img-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .building-card-body {
-      padding: 12px 16px 10px 16px;
-      background: #ffffff;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .building-title {
-      color: #0f172a;
-      font-size: 1.3rem;
-      font-weight: 700;
-      margin: 0;
-      line-height: 1.25;
-      word-break: break-word;
-    }
-
-    .btn-edit-building {
-      background: #f8fafc;
-      color: #334155;
-      border: 1px solid #cbd5e1;
-      border-radius: 20px;
-      padding: 5px 12px;
-      font-size: 0.82rem;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      flex-shrink: 0;
-      cursor: pointer;
-    }
-
-    .btn-edit-building:hover, .btn-edit-building:active {
-      background: #e2e8f0;
-      color: #0f172a;
-    }
-
-    .building-card-footer {
-      padding: 9px 16px 12px 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #ffffff;
-      border-top: 1px solid #f1f5f9;
-      font-size: 0.85rem;
-    }
-
-    /* Active Building Banner */
-    .selected-building-banner {
-      background: #ffffff;
-      border-radius: 14px;
-      border: 1px solid var(--border-color);
-      padding: 10px 12px;
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-
-    .selected-building-thumb {
-      width: 52px;
-      height: 52px;
-      border-radius: 10px;
-      object-fit: cover;
-      flex-shrink: 0;
-      border: 1px solid var(--border-color);
-    }
-
-    /* Status Summary Scorecard (3 columns + total header) */
-    .status-summary-card {
-      background: #ffffff;
-      border-radius: 16px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
-      overflow: hidden;
-    }
-
-    .status-summary-header {
-      background: #f8fafc;
-      padding: 9px 14px;
-      border-bottom: 1px solid var(--border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: #334155;
-    }
-
-    .status-summary-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      text-align: center;
-    }
-
-    .status-stat-col {
-      padding: 14px 6px;
-      cursor: pointer;
-      transition: background 0.15s ease;
-    }
-
-    .status-stat-col:active {
-      background: #f1f5f9;
-    }
-
-    .stat-label {
-      font-size: 0.82rem;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-
-    .stat-num {
-      font-size: 1.9rem;
-      font-weight: 700;
-      line-height: 1.1;
-    }
-
-    /* Work Type Summary Card */
-    .type-summary-card {
-      background: #ffffff;
-      border-radius: 16px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-      padding: 12px 14px;
-    }
-
-    .type-chip-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin-top: 8px;
-    }
-
-    .type-summary-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 20px;
-      padding: 5px 11px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #334155;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .type-summary-chip.active {
-      background: #0284c7;
-      border-color: #0284c7;
-      color: #ffffff;
-    }
-
-    .type-summary-chip .count-pill {
-      background: #e2e8f0;
-      color: #0f172a;
-      border-radius: 12px;
-      padding: 1px 7px;
-      font-size: 0.74rem;
-      font-weight: 700;
-    }
-
-    .type-summary-chip.active .count-pill {
-      background: rgba(255, 255, 255, 0.25);
-      color: #ffffff;
-    }
-
-    /* Interactive Calendar with Status Dots */
-    .calendar-box {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 10px;
-      margin-top: 10px;
-      margin-bottom: 10px;
-    }
-
-    .cal-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
-    .cal-nav-btn {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      width: 30px;
-      height: 30px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      color: #334155;
-      cursor: pointer;
-    }
-
-    .cal-weekdays {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      text-align: center;
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #64748b;
-      margin-bottom: 4px;
-    }
-
-    .cal-days-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 3px;
-    }
-
-    .cal-day-cell {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      min-height: 42px;
-      padding: 4px 2px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      cursor: pointer;
-      transition: all 0.12s ease;
-    }
-
-    .cal-day-cell.empty {
-      background: transparent;
-      border-color: transparent;
-      cursor: default;
-    }
-
-    .cal-day-cell.today {
-      border-color: #0284c7;
-      background: #f0f9ff;
-    }
-
-    .cal-day-cell.selected {
-      background: #0284c7;
-      border-color: #0284c7;
-      color: #ffffff;
-    }
-
-    .cal-day-num {
-      font-size: 0.8rem;
-      font-weight: 600;
-      line-height: 1.2;
-    }
-
-    .cal-dots {
-      display: flex;
-      gap: 2px;
-      margin-top: 3px;
-      min-height: 6px;
-    }
-
-    .cal-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-
-    .dot-pending { background-color: #f59e0b; }
-    .dot-inprogress { background-color: #0284c7; }
-    .dot-done { background-color: #16a34a; }
-    .cal-day-cell.selected .dot-inprogress { background-color: #bae6fd; }
-
-    .cal-legend {
-      display: flex;
-      justify-content: center;
-      gap: 12px;
-      margin-top: 8px;
-      font-size: 0.72rem;
-      color: #475569;
-    }
-
-    .cal-legend span {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    /* Step Card */
-    .step-card {
-      background: var(--card-bg);
-      border-radius: 14px;
-      border: 1px solid var(--border-color);
-      padding: 16px;
-      margin-bottom: 14px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-
-    .step-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
-      font-weight: 600;
-      color: var(--primary-dark);
-      font-size: 1rem;
-    }
-
-    .step-badge {
-      background: #e0f2fe;
-      color: var(--primary-dark);
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.85rem;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-
-    /* Mode Selector Toggle */
-    .time-mode-tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .time-mode-btn {
-      flex: 1;
-      border: 1px solid #cbd5e1;
-      background: #f8fafc;
-      color: #475569;
-      border-radius: 10px;
-      padding: 8px 10px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .time-mode-btn.active-live {
-      background: #e0f2fe;
-      border-color: #0284c7;
-      color: #0369a1;
-    }
-
-    .time-mode-btn.active-backdate {
-      background: #fef3c7;
-      border-color: #d97706;
-      color: #b45309;
-    }
-
-    /* Camera Upload Box */
-    .camera-box {
-      border: 2px dashed #93c5fd;
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-      background: #f0f9ff;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .camera-box:active {
-      background: #e0f2fe;
-      transform: scale(0.99);
-    }
-
-    .camera-icon {
-      font-size: 2.3rem;
-      color: var(--primary-color);
-      margin-bottom: 6px;
-    }
-
-    .preview-container {
-      position: relative;
-      border-radius: 12px;
-      overflow: hidden;
-      margin-top: 8px;
-      display: none;
-      border: 1px solid var(--border-color);
-    }
-
-    .preview-container img {
-      width: 100%;
-      max-height: 280px;
-      object-fit: cover;
-      display: block;
-    }
-
-    .btn-retake {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(15, 23, 42, 0.78);
-      color: white;
-      border: none;
-      border-radius: 20px;
-      padding: 6px 14px;
-      font-size: 0.82rem;
-    }
-
-    /* Multi-image gallery preview */
-    .multi-preview-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .multi-thumb-wrap {
-      position: relative;
-      border-radius: 10px;
-      overflow: hidden;
-      border: 1px solid var(--border-color);
-      aspect-ratio: 1 / 1;
-      background: #f1f5f9;
-    }
-
-    .multi-thumb-wrap img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .btn-remove-thumb {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      border: none;
-      background: rgba(15, 23, 42, 0.8);
-      color: #ffffff;
-      font-size: 0.72rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-    }
-
-    .thumb-wrap-badge {
-      position: relative;
-      flex-shrink: 0;
-    }
-
-    .thumb-count-badge {
-      position: absolute;
-      bottom: 4px;
-      right: 4px;
-      background: rgba(15, 23, 42, 0.82);
-      color: #ffffff;
-      font-size: 0.7rem;
-      font-weight: 700;
-      padding: 1px 6px;
-      border-radius: 8px;
-    }
-
-    /* Form Controls */
-    .form-label {
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: #334155;
-      margin-bottom: 5px;
-    }
-
-    .form-control, .form-select {
-      border-radius: 10px;
-      border: 1px solid #cbd5e1;
-      padding: 10px 13px;
-      font-size: 0.95rem;
-    }
-
-    .form-control:focus, .form-select:focus {
-      border-color: var(--primary-color);
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
-    }
-
-    /* Bottom Navigation */
-    .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: #ffffff;
-      border-top: 1px solid var(--border-color);
-      display: none;
-      justify-content: space-around;
-      padding: 8px 0;
-      z-index: 1000;
-      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
-    }
-
-    .nav-item-btn {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      background: none;
-      color: var(--text-muted);
-      font-size: 0.78rem;
-      font-weight: 500;
-      padding: 4px 0;
-      gap: 3px;
-    }
-
-    .nav-item-btn i {
-      font-size: 1.25rem;
-    }
-
-    .nav-item-btn.active {
-      color: var(--primary-color);
-      font-weight: 700;
-    }
-
-    /* Log Card */
-    .log-card {
-      background: white;
-      border-radius: 14px;
-      border: 1px solid var(--border-color);
-      padding: 14px;
-      margin-bottom: 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-    }
-
-    .badge-floor {
-      background: #e0f2fe;
-      color: #0369a1;
-      font-weight: 600;
-      padding: 4px 9px;
-      border-radius: 8px;
-      font-size: 0.78rem;
-    }
-
-    .badge-type {
-      background: #f0fdf4;
-      color: #166534;
-      font-weight: 600;
-      padding: 4px 9px;
-      border-radius: 8px;
-      font-size: 0.78rem;
-      border: 1px solid #bbf7d0;
-    }
-
-    /* Status Badges & Controls */
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 10px;
-      border-radius: 20px;
-      font-size: 0.78rem;
-      font-weight: 700;
-    }
-
-    .status-pending {
-      background: #fef3c7;
-      color: #b45309;
-      border: 1px solid #fde68a;
-    }
-
-    .status-inprogress {
-      background: #e0f2fe;
-      color: #0369a1;
-      border: 1px solid #bae6fd;
-    }
-
-    .status-done {
-      background: #dcfce7;
-      color: #15803d;
-      border: 1px solid #bbf7d0;
-    }
-
-    .days-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-
-    .days-today {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #cbd5e1;
-    }
-
-    .days-warn {
-      background: #ffedd5;
-      color: #c2410c;
-      border: 1px solid #fed7aa;
-    }
-
-    .days-danger {
-      background: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
-    }
-
-    .status-update-bar {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px dashed #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .status-select-sm {
-      border-radius: 8px;
-      border: 1px solid #cbd5e1;
-      padding: 5px 10px;
-      font-size: 0.82rem;
-      font-weight: 600;
-      background-color: #f8fafc;
-      color: #0f172a;
-      max-width: 195px;
-    }
-
-    .status-filter-pills {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-      margin-top: 10px;
-    }
-
-    .status-filter-btn {
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #475569;
-      border-radius: 20px;
-      padding: 4px 12px;
-      font-size: 0.78rem;
-      font-weight: 600;
-      white-space: nowrap;
-      cursor: pointer;
-    }
-
-    .status-filter-btn.active {
-      background: #0f172a;
-      color: #ffffff;
-      border-color: #0f172a;
-    }
-
-    .log-img-thumb {
-      width: 78px;
-      height: 78px;
-      border-radius: 10px;
-      object-fit: cover;
-      cursor: pointer;
-      border: 1px solid var(--border-color);
-      flex-shrink: 0;
-    }
-
-    .modal-img-full {
-      width: 100%;
-      border-radius: 10px;
-    }
-
-    .btn-submit {
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-      color: white;
-      border-radius: 12px;
-      padding: 14px;
-      font-size: 1.05rem;
-      font-weight: 600;
-      border: none;
-      width: 100%;
-      box-shadow: 0 4px 10px rgba(2, 132, 199, 0.28);
-    }
-
-    .btn-submit:disabled {
-      opacity: 0.6;
-      box-shadow: none;
-    }
-
-    .edit-bld-img-preview {
-      width: 100%;
-      height: 160px;
-      object-fit: cover;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
-    }
+    @page { size: A4; margin: 14mm; }
+    body { font-family: "Noto Sans Thai", "Sarabun", sans-serif; font-size: 11px; color: #0f172a; line-height: 1.4; }
+    .header-box { background: #0f172a; color: #ffffff; padding: 14px 18px; border-radius: 6px; margin-bottom: 14px; }
+    .header-title { font-size: 17px; font-weight: bold; margin: 0 0 4px 0; }
+    .header-sub { font-size: 11px; color: #cbd5e1; margin: 0; }
+    .kpi-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    .kpi-table td { width: 25%; border: 1px solid #cbd5e1; padding: 8px; text-align: center; background: #f8fafc; }
+    .kpi-num { font-size: 18px; font-weight: bold; margin-top: 2px; }
+    .sec-title { font-size: 13px; font-weight: bold; color: #0369a1; margin: 12px 0 6px 0; border-bottom: 2px solid #0284c7; padding-bottom: 3px; }
+    table.data-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10px; }
+    table.data-table th { background: #1e293b; color: #ffffff; padding: 6px 5px; border: 1px solid #cbd5e1; text-align: center; }
+    table.data-table td { padding: 5px; border: 1px solid #cbd5e1; vertical-align: top; }
+    table.data-table tr:nth-child(even) td { background: #f8fafc; }
+    .two-col { width: 100%; border-collapse: collapse; }
+    .two-col > tbody > tr > td { vertical-align: top; }
   </style>
 </head>
 <body>
-
-  <!-- Top App Bar -->
-  <header class="app-header">
-    <div class="d-flex justify-content-between align-items-center">
-      <div id="headerHomeLeft">
-        <h1><i class="fa-solid fa-helmet-safety text-warning"></i> ระบบติดตามงานช่างอาคาร</h1>
-        <div class="sub-date" id="headerDate"><i class="fa-regular fa-clock me-1"></i> กำลังโหลดวันเวลา...</div>
-      </div>
-
-      <div id="headerBuildingLeft" style="display: none;">
-        <button type="button" class="btn-back-home" onclick="goHome()">
-          <i class="fa-solid fa-arrow-left"></i> เปลี่ยนอาคาร
-        </button>
-      </div>
-
-      <div id="headerRightTitle" class="text-end">
-        <span class="badge bg-primary px-2 py-1"><i class="fa-solid fa-building me-1"></i> 5 อาคาร</span>
-      </div>
-    </div>
-  </header>
-
-  <main class="container py-3" style="max-width: 600px;">
-
-    <!-- ========================================== -->
-    <!-- PAGE 1: หน้าหลักเลือกอาคาร (HOME)            -->
-    <!-- ========================================== -->
-    <div id="view-buildings">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h5 class="fw-bold mb-0 text-dark">เลือกอาคารที่ปฏิบัติงาน</h5>
-          <small class="text-muted">แตะที่อาคารเพื่อลงงาน หรือดูประวัติย้อนหลัง</small>
-        </div>
-        <div class="d-flex gap-2">
-          <button class="btn btn-danger btn-sm rounded-pill px-3 fw-semibold" onclick="openPdfModal('ALL', 'ทุกอาคาร')">
-            <i class="fa-solid fa-file-pdf me-1"></i> สรุป PDF
-          </button>
-          <button class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-semibold" onclick="openAddBuildingModal()">
-            <i class="fa-solid fa-plus me-1"></i> เพิ่มอาคาร
-          </button>
-        </div>
-      </div>
-
-      <div id="buildingsList">
-        <div class="text-center py-5 text-muted">
-          <div class="spinner-border text-primary mb-2" role="status"></div>
-          <div>กำลังโหลดรายชื่ออาคาร...</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- PAGE 2: พื้นที่ทำงานของอาคารที่เลือก         -->
-    <!-- ========================================== -->
-    <div id="view-building-workspace" style="display: none;">
-
-      <!-- แถบแสดงอาคารที่เลือกอยู่ปัจจุบัน -->
-      <div class="selected-building-banner">
-        <img id="activeBldImg" src="" class="selected-building-thumb" alt="อาคาร">
-        <div class="flex-grow-1">
-          <small class="text-muted d-block" style="font-size: 0.75rem;">อาคารที่กำลังดำเนินการ</small>
-          <h5 class="fw-bold mb-0 text-dark" id="activeBldName">-</h5>
-        </div>
-        <button type="button" class="btn btn-light btn-sm border rounded-pill px-3" onclick="openEditActiveBuilding()">
-          <i class="fa-solid fa-pen text-primary me-1"></i> แก้ไข
-        </button>
-      </div>
-
-      <!-- TAB 1: ลงงานใหม่ -->
-      <div id="tab-add-task">
-        <form id="taskForm" onsubmit="handleFormSubmit(event)">
-
-          <!-- ขั้นตอนที่ 1: เลือกรูปแบบเวลา -->
-          <div class="step-card">
-            <div class="step-header">
-              <span class="step-badge">1</span>
-              <span>ขั้นตอนที่ 1 : วันและเวลาที่ปฏิบัติงาน</span>
-            </div>
-
-            <div class="time-mode-tabs">
-              <button type="button" class="time-mode-btn active-live" id="btnModeLive" onclick="setLogTimeMode('live')">
-                <i class="fa-solid fa-bolt"></i> เวลาปัจจุบัน (สด)
-              </button>
-              <button type="button" class="time-mode-btn" id="btnModeBackdate" onclick="setLogTimeMode('backdate')">
-                <i class="fa-solid fa-calendar-plus"></i> ลงงานย้อนหลัง
-              </button>
-            </div>
-
-            <div id="liveTimeBox" class="d-flex align-items-center justify-content-between p-2 rounded bg-light border">
-              <div>
-                <small class="text-muted d-block">เวลาบันทึกปัจจุบัน</small>
-                <strong id="liveClock" class="text-primary fs-5">--:--:-- น.</strong>
-              </div>
-              <span class="badge bg-success"><i class="fa-solid fa-circle-dot me-1"></i> บันทึกสดหน้างาน</span>
-            </div>
-
-            <div id="backdateTimeBox" class="p-2 rounded bg-warning-subtle border border-warning-subtle" style="display: none;">
-              <div class="row g-2">
-                <div class="col-7">
-                  <label class="form-label mb-1 small" for="customDate">วันที่ทำงาน <span class="text-danger">*</span></label>
-                  <input type="date" class="form-control form-control-sm" id="customDate">
-                </div>
-                <div class="col-5">
-                  <label class="form-label mb-1 small" for="customTime">เวลา <span class="text-danger">*</span></label>
-                  <input type="time" class="form-control form-control-sm" id="customTime">
-                </div>
-              </div>
-              <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
-                <i class="fa-solid fa-circle-info me-1"></i> เลือกวันที่และเวลาที่ทำงานจริงย้อนหลังได้ตามต้องการ
-              </small>
-            </div>
-          </div>
-
-          <!-- ขั้นตอนที่ 2: ถ่ายรูปหน้างาน (หลายภาพ หรือ ไม่ใส่ภาพก็ได้) -->
-          <div class="step-card">
-            <div class="step-header">
-              <span class="step-badge">2</span>
-              <span>ขั้นตอนที่ 2 : รูปหน้างาน (ใส่หลายรูปได้ / ไม่บังคับ)</span>
-            </div>
-
-            <div class="camera-box" id="cameraBox" onclick="triggerCamera()">
-              <i class="fa-solid fa-camera camera-icon"></i>
-              <div class="fw-bold">กดเพื่อ "ถ่ายรูป" หรือ "เลือกหลายรูป"</div>
-              <small class="text-muted">สามารถข้ามขั้นตอนนี้ได้หากไม่มีรูปภาพ</small>
-              <input type="file" id="photoInput" accept="image/*" multiple style="display: none;" onchange="handlePhotoSelected(event)">
-            </div>
-
-            <div id="multiPreviewGrid" class="multi-preview-grid" style="display: none;"></div>
-            <div id="addMorePhotoBar" class="mt-2 text-end" style="display: none;">
-              <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" onclick="triggerCamera()">
-                <i class="fa-solid fa-plus me-1"></i> เพิ่มรูปอีก
-              </button>
-            </div>
-          </div>
-
-          <!-- ขั้นตอนที่ 3: ลงรายละเอียด -->
-          <div class="step-card">
-            <div class="step-header">
-              <span class="step-badge">3</span>
-              <span>ขั้นตอนที่ 3 : ลงรายละเอียดงาน</span>
-            </div>
-
-            <!-- ชั้นไหน -->
-            <div class="mb-3">
-              <label class="form-label" for="floor"><i class="fa-solid fa-layer-group me-1 text-primary"></i> ชั้นไหน <span class="text-danger">*</span></label>
-              <select class="form-select" id="floor" required>
-                <option value="" selected disabled>-- ระบุชั้น --</option>
-                <option value="ชั้น B (ใต้ดิน)">ชั้น B (ใต้ดิน)</option>
-                <option value="ชั้น 1">ชั้น 1</option>
-                <option value="ชั้น 2">ชั้น 2</option>
-                <option value="ชั้น 3">ชั้น 3</option>
-                <option value="ชั้น 4">ชั้น 4</option>
-                <option value="ชั้น 5">ชั้น 5</option>
-                <option value="ชั้น 6">ชั้น 6</option>
-                <option value="ชั้น 7">ชั้น 7</option>
-                <option value="ชั้น 8">ชั้น 8</option>
-                <option value="ชั้นดาดฟ้า">ชั้นดาดฟ้า</option>
-                <option value="ภายนอกอาคาร/รอบอาคาร">ภายนอกอาคาร / รอบอาคาร</option>
-              </select>
-            </div>
-
-            <!-- ประเภทงาน (เพิ่ม งานส่วนกลาง) -->
-            <div class="mb-3">
-              <label class="form-label" for="workType"><i class="fa-solid fa-wrench me-1 text-primary"></i> ประเภทงาน <span class="text-danger">*</span></label>
-              <select class="form-select" id="workType" required>
-                <option value="" selected disabled>-- เลือกประเภทงาน --</option>
-                <option value="งานส่วนกลาง">งานส่วนกลาง</option>
-                <option value="งานระบบไฟฟ้า / ส่องสว่าง">งานระบบไฟฟ้า / แสงสว่าง</option>
-                <option value="งานระบบประปา / สุขาภิบาล / ท่อน้ำ">งานระบบประปา / สุขาภิบาล / ท่อน้ำ</option>
-                <option value="งานระบบปรับอากาศ (HVAC) / แอร์">งานระบบปรับอากาศ (HVAC) / แอร์</option>
-                <option value="งานโครงสร้าง / ฝ้า / พื้น / กระเบื้อง">งานโครงสร้าง / ฝ้า / พื้น / กระเบื้อง</option>
-                <option value="งานทาสี / เก็บความเรียบร้อยตกแต่ง">งานทาสี / เก็บความเรียบร้อยตกแต่ง</option>
-                <option value="งานประตู / หน้าต่าง / กระจก / ล็อก">งานประตู / หน้าต่าง / กระจก / ล็อก</option>
-                <option value="งานระบบดับเพลิง / สัญญาณเตือน">งานระบบดับเพลิง / ความปลอดภัย</option>
-                <option value="งานตรวจสอบบำรุงรักษาประจำวัน (PM)">งานตรวจเช็กประจำวัน (PM)</option>
-                <option value="งานอื่นๆ">งานอื่นๆ</option>
-              </select>
-            </div>
-
-            <!-- ผู้ปฏิบัติงาน / ผู้รับเหมา -->
-            <div class="mb-3">
-              <label class="form-label" for="contractorType"><i class="fa-solid fa-user-gear me-1 text-primary"></i> ผู้ปฏิบัติงาน / ผู้รับเหมา <span class="text-danger">*</span></label>
-              <select class="form-select" id="contractorType" required onchange="handleContractorChange()">
-                <option value="" selected disabled>-- เลือกผู้ปฏิบัติงาน --</option>
-                <option value="ช่างอาคารบริษัท">1. ช่างอาคารบริษัท</option>
-                <option value="ผู้รับเหมา">2. ผู้รับเหมา (ระบุชื่อ)</option>
-                <option value="อื่นๆ">3. อื่นๆ</option>
-              </select>
-              <div id="contractorNameBox" class="mt-2" style="display: none;">
-                <input type="text" class="form-control" id="contractorName" placeholder="ระบุชื่อผู้รับเหมา / บริษัท...">
-              </div>
-            </div>
-
-
-
-            <!-- ชื่อผู้ฝากงาน -->
-            <div class="mb-3">
-              <label class="form-label" for="requesterName"><i class="fa-solid fa-user-pen me-1 text-primary"></i> ชื่อผู้ฝากงาน <span class="text-danger">*</span></label>
-              <input type="text" class="form-control" id="requesterName" placeholder="ระบุชื่อผู้แจ้ง / ผู้ฝากงาน..." required>
-            </div>
-
-            <!-- รายละเอียดงาน -->
-            <div class="mb-2">
-              <label class="form-label" for="details"><i class="fa-solid fa-list-check me-1 text-primary"></i> รายละเอียดงานที่ทำ ณ เวลานั้น <span class="text-danger">*</span></label>
-              <textarea class="form-control" id="details" rows="3" placeholder="ระบุเนื้องาน ความคืบหน้า หรือปัญหาที่พบ..." required></textarea>
-            </div>
-          </div>
-
-          <button type="submit" id="submitBtn" class="btn-submit mb-4">
-            <i class="fa-solid fa-cloud-arrow-up me-2"></i> บันทึกข้อมูลงานหน้างาน
-          </button>
-        </form>
-      </div>
-
-      <!-- TAB 2: ดูงานย้อนหลังและอัปเดตสถานะ -->
-      <div id="tab-history" style="display: none;">
-
-        <!-- การ์ดสรุปสถานะงาน 3 ช่อง + จำนวนงานทั้งหมด -->
-        <div class="status-summary-card mb-3">
-          <div class="status-summary-header">
-            <span><i class="fa-solid fa-chart-pie text-primary me-1"></i> สรุปสถานะงาน</span>
-            <div class="d-flex align-items-center gap-1">
-              <button type="button" class="btn btn-danger btn-sm rounded-pill px-2 py-0 fw-semibold" style="font-size:0.75rem; line-height:1.6;" onclick="openPdfForActiveBuilding()">
-                <i class="fa-solid fa-file-pdf me-1"></i> โหลด PDF
-              </button>
-              <span class="badge bg-dark rounded-pill px-2 py-1" id="sumTotalBadge" style="cursor:pointer;" onclick="setStatusFilter('ALL', document.getElementById('filterPillAll'))">
-                ทั้งหมด: 0 งาน
-              </span>
-            </div>
-          </div>
-          <div class="status-summary-grid">
-            <div class="status-stat-col" onclick="setStatusFilter('รอดำเนินการ', document.getElementById('filterPillPending'))">
-              <div class="stat-label" style="color: #b45309;">รอดำเนินการ</div>
-              <div class="stat-num" style="color: #d97706;" id="sumPending">0</div>
-            </div>
-            <div class="status-stat-col border-start border-end" onclick="setStatusFilter('กำลังดำเนินการ', document.getElementById('filterPillInProgress'))">
-              <div class="stat-label" style="color: #0369a1;">กำลังดำเนินการ</div>
-              <div class="stat-num" style="color: #0284c7;" id="sumInProgress">0</div>
-            </div>
-            <div class="status-stat-col" onclick="setStatusFilter('ดำเนินการเสร็จสิ้น', document.getElementById('filterPillDone'))">
-              <div class="stat-label" style="color: #15803d;">เสร็จสิ้นแล้ว</div>
-              <div class="stat-num" style="color: #16a34a;" id="sumDone">0</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- การ์ดสรุปยอดงานแยกตามหัวข้อ (ประเภทงาน) -->
-        <div class="type-summary-card mb-3" id="typeSummaryCard" style="display: none;">
-          <div class="d-flex justify-content-between align-items-center">
-            <span class="fw-bold text-dark" style="font-size: 0.85rem;">
-              <i class="fa-solid fa-tags text-primary me-1"></i> สรุปยอดงานแต่ละหัวข้อ (แตะเพื่อกรอง)
-            </span>
-            <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" style="font-size: 0.78rem;" onclick="setWorkTypeFilter('ALL')">ดูทุกหัวข้อ</button>
-          </div>
-          <div class="type-chip-list" id="typeSummaryChips"></div>
-        </div>
-
-        <div class="card border-0 shadow-sm rounded-4 p-3 mb-3 bg-white">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <label class="form-label fw-bold mb-0"><i class="fa-regular fa-calendar-days me-1 text-primary"></i> ดูงานทั้งหมด / ปฏิทิน</label>
-            <div class="d-flex gap-1">
-              <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" id="btnDateAll" onclick="selectCalendarDate('ALL')">ทั้งหมด</button>
-              <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" id="btnToggleCalendar" onclick="toggleCalendar()">
-                <i class="fa-regular fa-calendar me-1"></i> ปฏิทิน
-              </button>
-            </div>
-          </div>
-
-          <!-- ปฏิทินแบบมีจุดสีสถานะใต้แต่ละวัน -->
-          <div id="calendarWrapper" class="calendar-box" style="display: none;">
-            <div class="cal-header">
-              <button type="button" class="cal-nav-btn" onclick="changeCalMonth(-1)"><i class="fa-solid fa-chevron-left"></i></button>
-              <strong id="calMonthTitle" class="text-dark" style="font-size: 0.92rem;">-</strong>
-              <button type="button" class="cal-nav-btn" onclick="changeCalMonth(1)"><i class="fa-solid fa-chevron-right"></i></button>
-            </div>
-            <div class="cal-weekdays">
-              <div>อา</div><div>จ</div><div>อ</div><div>พ</div><div>พฤ</div><div>ศ</div><div>ส</div>
-            </div>
-            <div class="cal-days-grid" id="calDaysGrid"></div>
-            <div class="cal-legend">
-              <span><i class="cal-dot dot-pending"></i> รอดำเนินการ</span>
-              <span><i class="cal-dot dot-inprogress"></i> กำลังดำเนินการ</span>
-              <span><i class="cal-dot dot-done"></i> เสร็จสิ้นแล้ว</span>
-            </div>
-          </div>
-
-          <!-- ตัวกรองแยกตามหัวข้อประเภทงาน -->
-          <select class="form-select form-select-sm mb-1" id="filterWorkType" onchange="setWorkTypeFilter(this.value)">
-            <option value="ALL">ทุกหัวข้องาน (ทั้งหมด)</option>
-            <option value="งานส่วนกลาง">งานส่วนกลาง</option>
-            <option value="งานระบบไฟฟ้า / ส่องสว่าง">งานระบบไฟฟ้า / แสงสว่าง</option>
-            <option value="งานระบบประปา / สุขาภิบาล / ท่อน้ำ">งานระบบประปา / สุขาภิบาล / ท่อน้ำ</option>
-            <option value="งานระบบปรับอากาศ (HVAC) / แอร์">งานระบบปรับอากาศ (HVAC) / แอร์</option>
-            <option value="งานโครงสร้าง / ฝ้า / พื้น / กระเบื้อง">งานโครงสร้าง / ฝ้า / พื้น / กระเบื้อง</option>
-            <option value="งานทาสี / เก็บความเรียบร้อยตกแต่ง">งานทาสี / เก็บความเรียบร้อยตกแต่ง</option>
-            <option value="งานประตู / หน้าต่าง / กระจก / ล็อก">งานประตู / หน้าต่าง / กระจก / ล็อก</option>
-            <option value="งานระบบดับเพลิง / สัญญาณเตือน">งานระบบดับเพลิง / ความปลอดภัย</option>
-            <option value="งานตรวจสอบบำรุงรักษาประจำวัน (PM)">งานตรวจเช็กประจำวัน (PM)</option>
-            <option value="งานอื่นๆ">งานอื่นๆ</option>
-          </select>
-
-          <!-- ตัวกรองตามสถานะ -->
-          <div class="status-filter-pills">
-            <button type="button" class="status-filter-btn active" id="filterPillAll" onclick="setStatusFilter('ALL', this)">ทุกสถานะ</button>
-            <button type="button" class="status-filter-btn" id="filterPillPending" onclick="setStatusFilter('รอดำเนินการ', this)">รอดำเนินการ</button>
-            <button type="button" class="status-filter-btn" id="filterPillInProgress" onclick="setStatusFilter('กำลังดำเนินการ', this)">กำลังดำเนินการ</button>
-            <button type="button" class="status-filter-btn" id="filterPillDone" onclick="setStatusFilter('ดำเนินการเสร็จสิ้น', this)">เสร็จสิ้นแล้ว</button>
-          </div>
-        </div>
-
-        <div class="d-flex justify-content-between align-items-center mb-2 px-1">
-          <span class="text-muted small" id="logFilterLabel">กำลังโหลด...</span>
-          <span class="badge bg-primary rounded-pill px-3 py-1" id="logCountBadge">0 รายการ</span>
-        </div>
-
-        <div id="logsContainer"></div>
-      </div>
-
-    </div>
-  </main>
-
-  <!-- Bottom Navigation Bar -->
-  <nav class="bottom-nav" id="bottomNav">
-    <button class="nav-item-btn active" id="nav-btn-add" onclick="switchWorkspaceTab('add')">
-      <i class="fa-solid fa-plus-circle"></i>
-      <span>ลงงานใหม่</span>
-    </button>
-    <button class="nav-item-btn" id="nav-btn-history" onclick="switchWorkspaceTab('history')">
-      <i class="fa-solid fa-clock-rotate-left"></i>
-      <span>ดูงาน / อัปเดตสถานะ</span>
-    </button>
-  </nav>
-
-  <!-- Modal แก้ไขข้อมูลอาคาร / เพิ่มอาคาร -->
-  <div class="modal fade" id="editBuildingModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 rounded-4">
-        <div class="modal-header border-0 pb-0">
-          <h5 class="modal-title fw-bold" id="editBldModalTitle">แก้ไขข้อมูลอาคาร</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <input type="hidden" id="editBldId">
-          <input type="hidden" id="editBldNewBase64">
-
-          <div class="mb-3">
-            <label class="form-label">ชื่ออาคาร <span class="text-danger">*</span></label>
-            <input type="text" class="form-control" id="editBldName" placeholder="เช่น KOSIN, NAIL IT">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">รูปภาพอาคาร</label>
-            <img id="editBldImgPreview" src="" class="edit-bld-img-preview mb-2" alt="ตัวอย่างรูปอาคาร">
-            <div class="d-grid gap-2">
-              <button type="button" class="btn btn-outline-primary btn-sm rounded-3" onclick="document.getElementById('editBldPhotoInput').click()">
-                <i class="fa-solid fa-camera me-1"></i> ถ่ายรูป / เลือกรูปอาคารใหม่
-              </button>
-              <input type="file" id="editBldPhotoInput" accept="image/*" style="display: none;" onchange="handleBuildingPhotoSelected(event)">
-            </div>
-          </div>
-
-          <div class="mb-2">
-            <label class="form-label text-muted small">หรือระบุลิงก์รูปภาพ (URL)</label>
-            <input type="url" class="form-control form-control-sm" id="editBldImageUrl" placeholder="https://..." oninput="previewUrlChange()">
-          </div>
-        </div>
-        <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">ยกเลิก</button>
-          <button type="button" class="btn btn-primary rounded-3 px-4" id="saveBldBtn" onclick="saveBuildingChanges()">
-            <i class="fa-solid fa-check me-1"></i> บันทึกการแก้ไข
-          </button>
-        </div>
-      </div>
-    </div>
+  <div class="header-box">
+    <div class="header-title">รายงานสรุปผลการดำเนินงานช่างอาคาร</div>
+    <div class="header-sub">อาคาร: ${esc(targetBuildingName)} | ช่วงเวลา: ${esc(periodLabel)} | พิมพ์เมื่อ: ${esc(printedAt)}</div>
   </div>
 
-  <!-- Modal สำหรับดูรูปภาพหน้างานขนาดใหญ่ -->
-  <div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 rounded-4">
-        <div class="modal-header border-0 pb-0">
-          <h6 class="modal-title fw-bold" id="modalImageTitle">ภาพถ่ายหน้างาน</h6>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body text-center p-3">
-          <div id="modalImagesContainer" class="d-flex flex-column gap-2"></div>
-          <div class="mt-2 text-start small text-muted" id="modalImageDesc"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal สร้างและดาวน์โหลดรายงานสรุป PDF -->
-  <div class="modal fade" id="pdfExportModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 rounded-4">
-        <div class="modal-header border-0 pb-0">
-          <h5 class="modal-title fw-bold"><i class="fa-solid fa-file-pdf text-danger me-2"></i>ดาวน์โหลดรายงานสรุป PDF</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">เลือกอาคาร</label>
-            <select class="form-select" id="pdfBuildingSelect"></select>
-          </div>
-          <div class="row g-2 mb-2">
-            <div class="col-6">
-              <label class="form-label">เลือกปี</label>
-              <select class="form-select" id="pdfYearSelect">
-                <option value="ALL">ทุกปี (ทั้งหมด)</option>
-                <option value="2026" selected>พ.ศ. 2569 (2026)</option>
-                <option value="2025">พ.ศ. 2568 (2025)</option>
-                <option value="2027">พ.ศ. 2570 (2027)</option>
-              </select>
-            </div>
-            <div class="col-6">
-              <label class="form-label">เลือกเดือน</label>
-              <select class="form-select" id="pdfMonthSelect">
-                <option value="ALL" selected>ทุกเดือน (สรุปรายปี)</option>
-                <option value="01">มกราคม</option>
-                <option value="02">กุมภาพันธ์</option>
-                <option value="03">มีนาคม</option>
-                <option value="04">เมษายน</option>
-                <option value="05">พฤษภาคม</option>
-                <option value="06">มิถุนายน</option>
-                <option value="07">กรกฎาคม</option>
-                <option value="08">สิงหาคม</option>
-                <option value="09">กันยายน</option>
-                <option value="10">ตุลาคม</option>
-                <option value="11">พฤศจิกายน</option>
-                <option value="12">ธันวาคม</option>
-              </select>
-            </div>
-          </div>
-          <small class="text-muted d-block">
-            <i class="fa-solid fa-circle-info me-1"></i> รายงานจะสรุปยอดงานรายปี รายเดือน แยกตามหัวข้อ พร้อมตารางรายละเอียดงานทั้งหมด
-          </small>
-        </div>
-        <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-3" data-bs-dismiss="modal">ยกเลิก</button>
-          <button type="button" class="btn btn-danger rounded-3 px-4" id="btnGeneratePdf" onclick="downloadSummaryPdf()">
-            <i class="fa-solid fa-download me-1"></i> สร้างไฟล์ PDF
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bootstrap 5 JS & SweetAlert2 -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-  <script>
-    // === ตั้งค่าลิงก์ Google Apps Script Web App (/exec) ===
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyWYLGn1k11j-3I0inqe6OkQLpqHsscpLDleVmUY7hiMKkQy207kyNDQyE7obD-iHgZjg/exec";
-
-    async function callGasApi(action, payload) {
-      if (!GAS_API_URL || GAS_API_URL.includes("YOUR_GOOGLE_APPS_SCRIPT")) {
-        throw new Error("กรุณาใส่ลิงก์ Google Apps Script Web App ในตัวแปร GAS_API_URL ก่อนใช้งาน");
-      }
-
-      let response;
-      if (action === "getBuildingsData" || action === "getWorkLogs") {
-        const params = new URLSearchParams({ action: action, ...(payload || {}) });
-        response = await fetch(`${GAS_API_URL}?${params.toString()}`, {
-          method: "GET",
-          redirect: "follow"
-        });
-      } else {
-        response = await fetch(GAS_API_URL, {
-          method: "POST",
-          redirect: "follow",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          body: JSON.stringify({ action: action, payload: payload || {} })
-        });
-      }
-
-      if (!response.ok) {
-        throw new Error("HTTP Error: " + response.status);
-      }
-      return await response.json();
-    }
-
-    let buildingsList = [];
-    let selectedImages = [];
-    let selectedBuilding = null;
-    let selectedDateFilter = 'ALL'; // 'ALL' หรือ 'yyyy-MM-dd'
-    let calYear = new Date().getFullYear();
-    let calMonth = new Date().getMonth(); // 0..11
-    let calendarVisible = false;
-    let statusFilter = 'ALL'; // 'ALL', 'รอดำเนินการ', 'กำลังดำเนินการ', 'ดำเนินการเสร็จสิ้น'
-    let workTypeFilter = 'ALL'; // 'ALL' หรือ ชื่อประเภทงาน
-    let logTimeMode = 'live'; // 'live' หรือ 'backdate'
-    let editModalInstance = null;
-
-    const FALLBACK_BLD_SVG = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="300" viewBox="0 0 600 300">
-        <rect width="600" height="300" fill="#e2e8f0"/>
-        <path d="M250 220V90h100v130H250zm20-110v20h20v-20h-20zm40 0v20h20v-20h-20zm-40 40v20h20v-20h-20zm40 0v20h20v-20h-20z" fill="#94a3b8"/>
-      </svg>`
-    );
-
-    const FALLBACK_LOG_SVG = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
-        <rect width="160" height="160" fill="#f1f5f9"/>
-        <text x="50%" y="52%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="14">ไม่มีรูป</text>
-      </svg>`
-    );
-
-    function updateClock() {
-      const now = new Date();
-      const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
-      document.getElementById('headerDate').innerHTML = `<i class="fa-regular fa-clock me-1"></i> ${now.toLocaleDateString('th-TH', options)}`;
-      const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const liveEl = document.getElementById('liveClock');
-      if (liveEl) liveEl.innerText = timeStr + ' น.';
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-
-    window.addEventListener('DOMContentLoaded', () => {
-      const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      const hhmm = now.toTimeString().slice(0, 5);
-      document.getElementById('customDate').value = today;
-      document.getElementById('customTime').value = hhmm;
-
-      editModalInstance = new bootstrap.Modal(document.getElementById('editBuildingModal'));
-      loadBuildings();
-    });
-
-    // ==============================================
-    // 1. ระบบหน้าแรก & จัดการอาคาร
-    // ==============================================
-    function loadBuildings() {
-      const container = document.getElementById('buildingsList');
-      callGasApi('getBuildingsData', {})
-        .then(res => {
-          if (res.status === 'success') {
-            buildingsList = res.buildings || [];
-            renderBuildings();
-          } else {
-            container.innerHTML = `<div class="alert alert-danger">${res.message}</div>`;
-          }
-        })
-        .catch(err => {
-          container.innerHTML = `<div class="alert alert-danger">โหลดข้อมูลไม่สำเร็จ: ${err.message || err}</div>`;
-        });
-    }
-
-    function renderBuildings() {
-      const container = document.getElementById('buildingsList');
-      const headerCount = document.getElementById('headerRightTitle');
-      headerCount.innerHTML = `<span class="badge bg-primary px-2 py-1"><i class="fa-solid fa-building me-1"></i> ${buildingsList.length} อาคาร</span>`;
-
-      if (buildingsList.length === 0) {
-        container.innerHTML = `<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลอาคาร กด "เพิ่มอาคาร" ด้านบน</div>`;
-        return;
-      }
-
-      let html = '';
-      buildingsList.forEach(bld => {
-        const safeImg = bld.imageUrl || FALLBACK_BLD_SVG;
-        html += `
-          <div class="building-card" onclick="selectBuilding('${bld.id}')">
-            <div class="building-img-wrap">
-              <img src="${safeImg}" alt="${bld.name}" onerror="this.onerror=null; this.src=FALLBACK_BLD_SVG;">
-            </div>
-            <div class="building-card-body">
-              <h4 class="building-title"><i class="fa-solid fa-building text-primary me-2" style="font-size:1.05rem;"></i>${bld.name}</h4>
-              <button type="button" class="btn-edit-building" onclick="event.stopPropagation(); openEditBuildingModal('${bld.id}')">
-                <i class="fa-solid fa-pen text-primary"></i> แก้ไข
-              </button>
-            </div>
-            <div class="building-card-footer">
-              <div>
-                <span class="badge bg-primary-subtle text-primary rounded-pill me-1">วันนี้ ${bld.todayCount} งาน</span>
-                <span class="badge bg-light text-secondary border rounded-pill">สะสม ${bld.totalCount} งาน</span>
-              </div>
-              <span class="text-primary fw-semibold">เข้าลงงาน <i class="fa-solid fa-chevron-right ms-1"></i></span>
-            </div>
-          </div>
-        `;
-      });
-      container.innerHTML = html;
-
-      if (selectedBuilding) {
-        const updated = buildingsList.find(b => b.id === selectedBuilding.id);
-        if (updated) {
-          selectedBuilding = updated;
-          document.getElementById('activeBldName').innerText = updated.name;
-          document.getElementById('activeBldImg').src = updated.imageUrl || FALLBACK_BLD_SVG;
-        }
-      }
-    }
-
-    function selectBuilding(bldId) {
-      const bld = buildingsList.find(b => b.id === bldId);
-      if (!bld) return;
-      selectedBuilding = bld;
-
-      document.getElementById('view-buildings').style.display = 'none';
-      document.getElementById('view-building-workspace').style.display = 'block';
-      document.getElementById('bottomNav').style.display = 'flex';
-
-      document.getElementById('headerHomeLeft').style.display = 'none';
-      document.getElementById('headerBuildingLeft').style.display = 'block';
-      document.getElementById('headerRightTitle').innerHTML = `<span class="fw-bold text-warning">${bld.name}</span>`;
-
-      document.getElementById('activeBldName').innerText = bld.name;
-      document.getElementById('activeBldImg').src = bld.imageUrl || FALLBACK_BLD_SVG;
-
-      selectedDateFilter = 'ALL';
-      calendarVisible = false;
-      const calWrap = document.getElementById('calendarWrapper');
-      if (calWrap) calWrap.style.display = 'none';
-      const btnAll = document.getElementById('btnDateAll');
-      if (btnAll) btnAll.className = 'btn btn-primary btn-sm rounded-pill px-3';
-      switchWorkspaceTab('add');
-    }
-
-    function goHome() {
-      selectedBuilding = null;
-      document.getElementById('view-buildings').style.display = 'block';
-      document.getElementById('view-building-workspace').style.display = 'none';
-      document.getElementById('bottomNav').style.display = 'none';
-
-      document.getElementById('headerHomeLeft').style.display = 'block';
-      document.getElementById('headerBuildingLeft').style.display = 'none';
-
-      loadBuildings();
-    }
-
-    // ==============================================
-    // 2. แก้ไขชื่อและรูปภาพอาคาร
-    // ==============================================
-    function openEditBuildingModal(bldId) {
-      const bld = buildingsList.find(b => b.id === bldId);
-      if (!bld) return;
-
-      document.getElementById('editBldModalTitle').innerText = 'แก้ไขข้อมูลอาคาร';
-      document.getElementById('editBldId').value = bld.id;
-      document.getElementById('editBldName').value = bld.name;
-      document.getElementById('editBldImageUrl').value = bld.rawImageUrl || '';
-      document.getElementById('editBldImgPreview').src = bld.imageUrl || FALLBACK_BLD_SVG;
-      document.getElementById('editBldNewBase64').value = '';
-      document.getElementById('editBldPhotoInput').value = '';
-
-      editModalInstance.show();
-    }
-
-    function openEditActiveBuilding() {
-      if (selectedBuilding) {
-        openEditBuildingModal(selectedBuilding.id);
-      }
-    }
-
-    function openAddBuildingModal() {
-      document.getElementById('editBldModalTitle').innerText = 'เพิ่มอาคารใหม่';
-      document.getElementById('editBldId').value = '';
-      document.getElementById('editBldName').value = '';
-      document.getElementById('editBldImageUrl').value = '';
-      document.getElementById('editBldImgPreview').src = FALLBACK_BLD_SVG;
-      document.getElementById('editBldNewBase64').value = '';
-      document.getElementById('editBldPhotoInput').value = '';
-
-      editModalInstance.show();
-    }
-
-    function previewUrlChange() {
-      const url = document.getElementById('editBldImageUrl').value.trim();
-      if (url && !document.getElementById('editBldNewBase64').value) {
-        document.getElementById('editBldImgPreview').src = url;
-      }
-    }
-
-    function compressImageFile(file, maxDim, callback) {
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const img = new Image();
-        img.onload = function() {
-          let width = img.width;
-          let height = img.height;
-          if (width > height && width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          callback(canvas.toDataURL('image/jpeg', 0.78));
-        };
-        img.src = e.target.result;
-      };
-      reader.readAsDataURL(file);
-    }
-
-    function handleBuildingPhotoSelected(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      compressImageFile(file, 1000, function(base64) {
-        document.getElementById('editBldNewBase64').value = base64;
-        document.getElementById('editBldImgPreview').src = base64;
-      });
-    }
-
-    function saveBuildingChanges() {
-      const name = document.getElementById('editBldName').value.trim();
-      if (!name) {
-        Swal.fire({ icon: 'warning', title: 'กรุณาระบุชื่ออาคาร' });
-        return;
-      }
-
-      const btn = document.getElementById('saveBldBtn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังบันทึก...';
-
-      const payload = {
-        id: document.getElementById('editBldId').value,
-        name: name,
-        imageUrl: document.getElementById('editBldImageUrl').value.trim(),
-        newImageBase64: document.getElementById('editBldNewBase64').value
-      };
-
-      callGasApi('saveBuildingInfo', payload)
-        .then(res => {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> บันทึกการแก้ไข';
-          if (res.status === 'success') {
-            buildingsList = res.buildings || [];
-            renderBuildings();
-            editModalInstance.hide();
-            Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลอาคารแล้ว', timer: 1500, showConfirmButton: false });
-          } else {
-            Swal.fire({ icon: 'error', title: 'ผิดพลาด', text: res.message });
-          }
-        })
-        .catch(err => {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-check me-1"></i> บันทึกการแก้ไข';
-          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
-        });
-    }
-
-    // ==============================================
-    // 3. สลับโหมดเวลาบันทึก & ลงงาน
-    // ==============================================
-    function setLogTimeMode(mode) {
-      logTimeMode = mode;
-      const btnLive = document.getElementById('btnModeLive');
-      const btnBack = document.getElementById('btnModeBackdate');
-      const liveBox = document.getElementById('liveTimeBox');
-      const backBox = document.getElementById('backdateTimeBox');
-
-      if (mode === 'live') {
-        btnLive.className = 'time-mode-btn active-live';
-        btnBack.className = 'time-mode-btn';
-        liveBox.style.display = 'flex';
-        backBox.style.display = 'none';
-      } else {
-        btnLive.className = 'time-mode-btn';
-        btnBack.className = 'time-mode-btn active-backdate';
-        liveBox.style.display = 'none';
-        backBox.style.display = 'block';
-      }
-    }
-
-    function handleContractorChange() {
-      const val = document.getElementById('contractorType').value;
-      const box = document.getElementById('contractorNameBox');
-      const input = document.getElementById('contractorName');
-
-      if (val === 'ผู้รับเหมา') {
-        box.style.display = 'block';
-        input.placeholder = 'ระบุชื่อบริษัท / ทีมผู้รับเหมา...';
-        input.required = true;
-      } else if (val === 'อื่นๆ') {
-        box.style.display = 'block';
-        input.placeholder = 'ระบุรายละเอียดผู้ปฏิบัติงานเพิ่มเติม...';
-        input.required = true;
-      } else {
-        box.style.display = 'none';
-        input.value = '';
-        input.required = false;
-      }
-    }
-
-    function switchWorkspaceTab(tab) {
-      const addTab = document.getElementById('tab-add-task');
-      const histTab = document.getElementById('tab-history');
-      const btnAdd = document.getElementById('nav-btn-add');
-      const btnHist = document.getElementById('nav-btn-history');
-
-      if (tab === 'add') {
-        addTab.style.display = 'block';
-        histTab.style.display = 'none';
-        btnAdd.classList.add('active');
-        btnHist.classList.remove('active');
-      } else {
-        addTab.style.display = 'none';
-        histTab.style.display = 'block';
-        btnAdd.classList.remove('active');
-        btnHist.classList.add('active');
-        loadBuildingHistory();
-      }
-    }
-
-    function triggerCamera() {
-      document.getElementById('photoInput').click();
-    }
-
-    function handlePhotoSelected(event) {
-      const files = Array.from(event.target.files || []);
-      if (files.length === 0) return;
-
-      Swal.fire({
-        title: `กำลังเตรียมรูปภาพ (${files.length} รูป)...`,
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-      });
-
-      let processed = 0;
-      files.forEach(file => {
-        compressImageFile(file, 1280, function(compressedBase64) {
-          selectedImages.push(compressedBase64);
-          processed++;
-          if (processed === files.length) {
-            event.target.value = '';
-            renderSelectedImages();
-            Swal.close();
-          }
-        });
-      });
-    }
-
-    function renderSelectedImages() {
-      const grid = document.getElementById('multiPreviewGrid');
-      const addMoreBar = document.getElementById('addMorePhotoBar');
-      const cameraBox = document.getElementById('cameraBox');
-
-      if (selectedImages.length === 0) {
-        grid.style.display = 'none';
-        grid.innerHTML = '';
-        addMoreBar.style.display = 'none';
-        cameraBox.style.display = 'block';
-        return;
-      }
-
-      cameraBox.style.display = 'none';
-      grid.style.display = 'grid';
-      addMoreBar.style.display = 'block';
-
-      let html = '';
-      selectedImages.forEach((b64, idx) => {
-        html += `
-          <div class="multi-thumb-wrap">
-            <img src="${b64}" alt="รูปที่ ${idx + 1}">
-            <button type="button" class="btn-remove-thumb" onclick="removeSelectedImage(${idx})">
-              <i class="fa-solid fa-xmark"></i>
-            </button>
-          </div>
-        `;
-      });
-      grid.innerHTML = html;
-    }
-
-    function removeSelectedImage(idx) {
-      selectedImages.splice(idx, 1);
-      renderSelectedImages();
-    }
-
-    function handleFormSubmit(event) {
-      event.preventDefault();
-      if (!selectedBuilding) return;
-
-      const isBackdate = (logTimeMode === 'backdate');
-      const customDate = document.getElementById('customDate').value;
-      const customTime = document.getElementById('customTime').value;
-
-      if (isBackdate && (!customDate || !customTime)) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'กรุณาระบุวันที่และเวลา',
-          text: 'เลือกวันที่และเวลาสำหรับงานย้อนหลังให้ครบถ้วน',
-          confirmButtonColor: '#0284c7'
-        });
-        return;
-      }
-
-
-
-      const contractorType = document.getElementById('contractorType').value;
-      const contractorName = document.getElementById('contractorName').value.trim();
-      let contractorFinal = contractorType;
-      if (contractorType === 'ผู้รับเหมา') {
-        contractorFinal = contractorName ? `ผู้รับเหมา: ${contractorName}` : 'ผู้รับเหมา';
-      } else if (contractorType === 'อื่นๆ') {
-        contractorFinal = contractorName ? `อื่นๆ: ${contractorName}` : 'อื่นๆ';
-      }
-
-      const payload = {
-        isBackdate: isBackdate,
-        customDate: customDate,
-        customTime: customTime,
-        imagesBase64: selectedImages,
-        buildingId: selectedBuilding.id,
-        buildingName: selectedBuilding.name,
-        floor: document.getElementById('floor').value,
-        workType: document.getElementById('workType').value,
-        contractor: contractorFinal,
-        requesterName: document.getElementById('requesterName').value.trim(),
-        workStatus: 'รอดำเนินการ',
-        details: document.getElementById('details').value.trim()
-      };
-
-      const submitBtn = document.getElementById('submitBtn');
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> กำลังบันทึกและอัปโหลดรูปภาพ...';
-
-      callGasApi('saveWorkLog', payload)
-        .then(res => {
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up me-2"></i> บันทึกข้อมูลงานหน้างาน';
-
-          if (res.status === 'success') {
-            Swal.fire({
-              icon: 'success',
-              title: 'บันทึกงานเข้าระบบเรียบร้อยแล้ว',
-              text: `กำลังพาท่านไปยังหน้าสถานะงานของอาคาร ${selectedBuilding.name}`,
-              confirmButtonText: 'ดูสถานะงาน',
-              confirmButtonColor: '#0284c7',
-              timer: 1800,
-              timerProgressBar: true
-            }).then(() => {
-              document.getElementById('taskForm').reset();
-              document.getElementById('contractorNameBox').style.display = 'none';
-              document.getElementById('contractorName').required = false;
-              selectedImages = [];
-              renderSelectedImages();
-
-              const now = new Date();
-              document.getElementById('customDate').value = now.toISOString().split('T')[0];
-              document.getElementById('customTime').value = now.toTimeString().slice(0, 5);
-              setLogTimeMode('live');
-
-              statusFilter = 'ALL';
-              workTypeFilter = 'ALL';
-              document.querySelectorAll('.status-filter-btn').forEach(b => b.classList.remove('active'));
-              const pillAll = document.getElementById('filterPillAll');
-              if (pillAll) pillAll.classList.add('active');
-              const filterWtEl = document.getElementById('filterWorkType');
-              if (filterWtEl) filterWtEl.value = 'ALL';
-
-              selectedDateFilter = 'ALL';
-              const btnAll = document.getElementById('btnDateAll');
-              if (btnAll) btnAll.className = 'btn btn-primary btn-sm rounded-pill px-3';
-              switchWorkspaceTab('history');
-            });
-          } else {
-            Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: res.message });
-          }
-        })
-        .catch(err => {
-          submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up me-2"></i> บันทึกข้อมูลงานหน้างาน';
-          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
-        });
-    }
-
-    // ==============================================
-    // 4. ดูงานย้อนหลัง & สรุปสถานะงาน & สรุปตามหัวข้อ
-    // ==============================================
-    function toggleCalendar() {
-      calendarVisible = !calendarVisible;
-      document.getElementById('calendarWrapper').style.display = calendarVisible ? 'block' : 'none';
-      if (calendarVisible) {
-        renderCalendar();
-      }
-    }
-
-    function changeCalMonth(delta) {
-      calMonth += delta;
-      if (calMonth < 0) {
-        calMonth = 11;
-        calYear--;
-      } else if (calMonth > 11) {
-        calMonth = 0;
-        calYear++;
-      }
-      renderCalendar();
-    }
-
-    function selectCalendarDate(dateStr) {
-      selectedDateFilter = dateStr || 'ALL';
-      const btnAll = document.getElementById('btnDateAll');
-      if (selectedDateFilter === 'ALL') {
-        btnAll.className = 'btn btn-primary btn-sm rounded-pill px-3';
-      } else {
-        btnAll.className = 'btn btn-outline-primary btn-sm rounded-pill px-3';
-      }
-      renderCalendar();
-      renderFilteredLogs();
-    }
-
-    function renderCalendar() {
-      const grid = document.getElementById('calDaysGrid');
-      const titleEl = document.getElementById('calMonthTitle');
-      if (!grid || !titleEl) return;
-
-      const thaiMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
-                          'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
-      titleEl.innerText = `${thaiMonths[calMonth]} ${calYear + 543}`;
-
-      const allLogs = window._currentLogsCache || [];
-      const dayStats = {};
-      allLogs.forEach(l => {
-        if (!l.date) return;
-        if (!dayStats[l.date]) {
-          dayStats[l.date] = { pending: false, inProgress: false, done: false };
-        }
-        if (l.workStatus === 'รอดำเนินการ') dayStats[l.date].pending = true;
-        else if (l.workStatus === 'ดำเนินการเสร็จสิ้น') dayStats[l.date].done = true;
-        else dayStats[l.date].inProgress = true;
-      });
-
-      const firstDay = new Date(calYear, calMonth, 1).getDay();
-      const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-      const todayStr = new Date().toISOString().split('T')[0];
-
-      let cellsHtml = '';
-      for (let i = 0; i < firstDay; i++) {
-        cellsHtml += `<div class="cal-day-cell empty"></div>`;
-      }
-
-      for (let d = 1; d <= daysInMonth; d++) {
-        const mm = String(calMonth + 1).padStart(2, '0');
-        const dd = String(d).padStart(2, '0');
-        const dateStr = `${calYear}-${mm}-${dd}`;
-        const st = dayStats[dateStr];
-
-        let dotsHtml = '';
-        if (st) {
-          if (st.pending) dotsHtml += `<span class="cal-dot dot-pending" title="รอดำเนินการ"></span>`;
-          if (st.inProgress) dotsHtml += `<span class="cal-dot dot-inprogress" title="กำลังดำเนินการ"></span>`;
-          if (st.done) dotsHtml += `<span class="cal-dot dot-done" title="เสร็จสิ้นแล้ว"></span>`;
-        }
-
-        const isSelected = (selectedDateFilter === dateStr);
-        const isToday = (todayStr === dateStr);
-        const cls = `cal-day-cell ${isSelected ? 'selected' : (isToday ? 'today' : '')}`;
-        const clickTarget = isSelected ? 'ALL' : dateStr;
-
-        cellsHtml += `
-          <div class="${cls}" onclick="selectCalendarDate('${clickTarget}')">
-            <span class="cal-day-num">${d}</span>
-            <div class="cal-dots">${dotsHtml}</div>
-          </div>
-        `;
-      }
-      grid.innerHTML = cellsHtml;
-    }
-
-    function setStatusFilter(status, btnEl) {
-      statusFilter = status;
-      document.querySelectorAll('.status-filter-btn').forEach(b => b.classList.remove('active'));
-      if (btnEl) btnEl.classList.add('active');
-      renderFilteredLogs();
-    }
-
-    function setWorkTypeFilter(workType) {
-      workTypeFilter = workType || 'ALL';
-      const selectEl = document.getElementById('filterWorkType');
-      if (selectEl) selectEl.value = workTypeFilter;
-      renderFilteredLogs();
-    }
-
-    function updateStatusAndTypeSummary(allLogs) {
-      // 1. สรุปสถานะ 3 ช่อง + ยอดรวม
-      const total = allLogs.length;
-      const pending = allLogs.filter(l => l.workStatus === 'รอดำเนินการ').length;
-      const inProgress = allLogs.filter(l => !l.workStatus || l.workStatus === 'กำลังดำเนินการ').length;
-      const done = allLogs.filter(l => l.workStatus === 'ดำเนินการเสร็จสิ้น').length;
-
-      document.getElementById('sumTotalBadge').innerText = `ทั้งหมด: ${total} งาน`;
-      document.getElementById('sumPending').innerText = pending;
-      document.getElementById('sumInProgress').innerText = inProgress;
-      document.getElementById('sumDone').innerText = done;
-
-      // 2. สรุปยอดแต่ละหัวข้อ (ประเภทงาน)
-      const typeCard = document.getElementById('typeSummaryCard');
-      const typeChips = document.getElementById('typeSummaryChips');
-
-      if (total === 0) {
-        typeCard.style.display = 'none';
-        typeChips.innerHTML = '';
-        return;
-      }
-
-      const countsByType = {};
-      allLogs.forEach(l => {
-        const wt = l.workType || 'ไม่ระบุ';
-        countsByType[wt] = (countsByType[wt] || 0) + 1;
-      });
-
-      // เรียงจากหัวข้อที่มีงานมากไปน้อย
-      const sortedTypes = Object.entries(countsByType).sort((a, b) => b[1] - a[1]);
-
-      let chipsHtml = '';
-      sortedTypes.forEach(([wt, count]) => {
-        const isActive = (workTypeFilter === wt);
-        const safeArg = wt.replace(/'/g, "\\'");
-        const toggleTarget = isActive ? 'ALL' : safeArg;
-        chipsHtml += `
-          <div class="type-summary-chip ${isActive ? 'active' : ''}" onclick="setWorkTypeFilter('${toggleTarget}')">
-            <span>${wt}</span>
-            <span class="count-pill">${count}</span>
-          </div>
-        `;
-      });
-
-      typeChips.innerHTML = chipsHtml;
-      typeCard.style.display = 'block';
-    }
-
-    function getElapsedDaysBadgeHtml(dateStr, status) {
-      if (!dateStr || status === 'ดำเนินการเสร็จสิ้น') return '';
-      const parts = String(dateStr).split('-');
-      if (parts.length !== 3) return '';
-
-      const jobDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const diffDays = Math.floor((today - jobDate) / (1000 * 60 * 60 * 24));
-
-      if (diffDays <= 0) {
-        return `<span class="days-badge days-today"><i class="fa-regular fa-calendar-check"></i> วันนี้</span>`;
-      } else if (diffDays <= 2) {
-        return `<span class="days-badge days-warn"><i class="fa-solid fa-clock"></i> ค้างมา ${diffDays} วัน</span>`;
-      } else {
-        return `<span class="days-badge days-danger"><i class="fa-solid fa-triangle-exclamation"></i> ค้างมา ${diffDays} วัน</span>`;
-      }
-    }
-
-    function getStatusBadgeHtml(status) {
-      if (status === 'รอดำเนินการ') {
-        return `<span class="status-pill status-pending"><i class="fa-regular fa-hourglass-half"></i> รอดำเนินการ</span>`;
-      } else if (status === 'ดำเนินการเสร็จสิ้น') {
-        return `<span class="status-pill status-done"><i class="fa-solid fa-circle-check"></i> ดำเนินการเสร็จสิ้น</span>`;
-      } else {
-        return `<span class="status-pill status-inprogress"><i class="fa-solid fa-screwdriver-wrench"></i> กำลังดำเนินการ</span>`;
-      }
-    }
-
-    function loadBuildingHistory() {
-      if (!selectedBuilding) return;
-
-      const container = document.getElementById('logsContainer');
-      container.innerHTML = `
-        <div class="text-center py-5 text-muted">
-          <div class="spinner-border text-primary mb-2" role="status"></div>
-          <div>กำลังโหลดข้อมูลงานทั้งหมด...</div>
-        </div>
-      `;
-
-      callGasApi('getWorkLogs', {
-          buildingId: selectedBuilding.id,
-          buildingName: selectedBuilding.name,
-          date: 'ALL'
-        })
-        .then(res => {
-          if (res.status === 'success') {
-            window._currentLogsCache = res.logs || [];
-            if (calendarVisible) renderCalendar();
-            renderFilteredLogs();
-          } else {
-            container.innerHTML = `<div class="alert alert-danger">${res.message}</div>`;
-          }
-        })
-        .catch(err => {
-          container.innerHTML = `<div class="alert alert-danger">เกิดข้อผิดพลาด: ${err.message || err}</div>`;
-        });
-    }
-
-    function renderFilteredLogs() {
-      const container = document.getElementById('logsContainer');
-      const badge = document.getElementById('logCountBadge');
-      const label = document.getElementById('logFilterLabel');
-      const allLogs = window._currentLogsCache || [];
-
-      const dateScopedLogs = selectedDateFilter === 'ALL'
-        ? allLogs
-        : allLogs.filter(l => l.date === selectedDateFilter);
-
-      if (label && selectedBuilding) {
-        label.innerText = selectedDateFilter === 'ALL'
-          ? `งานทั้งหมดของอาคาร ${selectedBuilding.name}`
-          : `งานวันที่ ${selectedDateFilter} (${selectedBuilding.name})`;
-      }
-
-      updateStatusAndTypeSummary(dateScopedLogs);
-      if (calendarVisible) renderCalendar();
-
-      let logs = dateScopedLogs;
-      if (statusFilter !== 'ALL') {
-        logs = logs.filter(l => l.workStatus === statusFilter);
-      }
-      if (workTypeFilter !== 'ALL') {
-        logs = logs.filter(l => l.workType === workTypeFilter);
-      }
-
-      badge.innerText = `${logs.length} รายการ`;
-
-      if (logs.length === 0) {
-        container.innerHTML = `
-          <div class="text-center py-5 bg-white rounded-4 border p-4">
-            <i class="fa-regular fa-folder-open text-muted fs-1 mb-2"></i>
-            <div class="fw-bold text-secondary">ไม่พบรายการงาน</div>
-            <small class="text-muted">ยังไม่มีการบันทึกงานตามเงื่อนไขที่เลือก</small>
-          </div>
-        `;
-        return;
-      }
-
-      let html = '';
-      logs.forEach(log => {
-        const origIdx = allLogs.indexOf(log);
-        const imgs = (log.images && log.images.length > 0) ? log.images : (log.imageUrl ? [log.imageUrl] : []);
-        let imgTag = '';
-        if (imgs.length > 0) {
-          const extraBadge = imgs.length > 1 ? `<span class="thumb-count-badge">+${imgs.length - 1} รูป</span>` : '';
-          imgTag = `
-            <div class="thumb-wrap-badge" onclick="openImageModalByIndex(${origIdx})" style="cursor:pointer;">
-              <img src="${imgs[0]}" class="log-img-thumb" alt="รูปหน้างาน" onerror="this.onerror=null; this.src=FALLBACK_LOG_SVG;">
-              ${extraBadge}
-            </div>
-          `;
-        } else {
-          imgTag = `<div class="log-img-thumb d-flex align-items-center justify-content-center bg-light text-muted small">ไม่มีรูป</div>`;
-        }
-
-        const currentStatus = log.workStatus || 'กำลังดำเนินการ';
-        const statusBadge = getStatusBadgeHtml(currentStatus);
-        const elapsedBadge = getElapsedDaysBadgeHtml(log.date, currentStatus);
-        const updatedInfo = log.statusUpdatedAt ? `<small class="text-muted d-block" style="font-size:0.7rem;">อัปเดต: ${log.statusUpdatedAt}</small>` : '';
-
-        html += `
-          <div class="log-card" id="log-card-${log.rowId}">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <div class="d-flex flex-wrap gap-1 align-items-center">
-                <span class="badge-floor">${log.floor}</span>
-                <span class="badge-type">${log.workType}</span>
-              </div>
-              <div class="text-end">
-                <span class="text-primary fw-bold small d-block"><i class="fa-regular fa-clock me-1"></i>${log.time} น.</span>
-                <small class="text-muted" style="font-size: 0.72rem;">${log.date}</small>
-              </div>
-            </div>
-
-            <div class="d-flex gap-3 align-items-start">
-              ${imgTag}
-              <div class="flex-grow-1">
-                ${log.requesterName ? `<div class="text-muted small mb-1"><i class="fa-solid fa-user-pen me-1"></i> ผู้ฝากงาน: <strong>${log.requesterName}</strong></div>` : ''}
-                <div class="text-muted small mb-1">
-                  <i class="fa-solid fa-user-tag me-1"></i> ผู้ปฏิบัติงาน: <strong>${log.contractor}</strong>
-                </div>
-                <div class="text-dark" style="font-size: 0.94rem; line-height: 1.45;">
-                  ${log.details}
-                </div>
-              </div>
-            </div>
-
-            <div class="status-update-bar">
-              <div>
-                <div id="status-badge-${log.rowId}" class="d-flex flex-wrap align-items-center gap-1">${statusBadge}${elapsedBadge}</div>
-                <div id="status-time-${log.rowId}">${updatedInfo}</div>
-              </div>
-              <select class="status-select-sm" onchange="handleStatusUpdate(${log.rowId}, this.value, this)">
-                <option value="รอดำเนินการ" ${currentStatus === 'รอดำเนินการ' ? 'selected' : ''}>รอดำเนินการ</option>
-                <option value="กำลังดำเนินการ" ${currentStatus === 'กำลังดำเนินการ' ? 'selected' : ''}>กำลังดำเนินการ</option>
-                <option value="ดำเนินการเสร็จสิ้น" ${currentStatus === 'ดำเนินการเสร็จสิ้น' ? 'selected' : ''}>ดำเนินการเสร็จสิ้น</option>
-              </select>
-            </div>
-          </div>
-        `;
-      });
-
-      container.innerHTML = html;
-    }
-
-    async function handleStatusUpdate(rowId, newStatus, selectEl) {
-      const target = (window._currentLogsCache || []).find(l => l.rowId === rowId);
-      const oldStatus = target ? (target.workStatus || 'รอดำเนินการ') : 'รอดำเนินการ';
-
-      const result = await Swal.fire({
-        title: 'กรอกรหัสผ่านเพื่อเปลี่ยนสถานะ',
-        text: `เปลี่ยนสถานะเป็น "${newStatus}"`,
-        input: 'password',
-        inputPlaceholder: 'กรอกรหัสผ่าน...',
-        inputAttributes: {
-          inputmode: 'numeric',
-          autocomplete: 'off'
-        },
-        showCancelButton: true,
-        confirmButtonText: 'ยืนยัน',
-        cancelButtonText: 'ยกเลิก',
-        confirmButtonColor: '#0284c7'
-      });
-
-      if (!result.isConfirmed || !result.value) {
-        selectEl.value = oldStatus;
-        return;
-      }
-      const pin = String(result.value).trim();
-
-      selectEl.disabled = true;
-
-      callGasApi('updateWorkStatus', { rowId: rowId, newStatus: newStatus, pin: pin })
-        .then(res => {
-          selectEl.disabled = false;
-          if (res.status === 'success') {
-            if (target) {
-              target.workStatus = res.newStatus;
-              target.statusUpdatedAt = res.updatedAt;
-            }
-            renderFilteredLogs();
-
-            Swal.fire({
-              toast: true,
-              position: 'top-end',
-              icon: 'success',
-              title: `อัปเดตเป็น "${res.newStatus}"`,
-              showConfirmButton: false,
-              timer: 1800
-            });
-          } else {
-            selectEl.value = oldStatus;
-            Swal.fire({ icon: 'error', title: 'รหัสผ่านไม่ถูกต้อง', text: res.message });
-          }
-        })
-        .catch(err => {
-          selectEl.disabled = false;
-          selectEl.value = oldStatus;
-          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
-        });
-    }
-
-    function openImageModalByIndex(idx) {
-      const log = (window._currentLogsCache || [])[idx];
-      if (!log) return;
-      const imgs = (log.images && log.images.length > 0) ? log.images : (log.imageUrl ? [log.imageUrl] : []);
-      if (imgs.length === 0) return;
-
-      const container = document.getElementById('modalImagesContainer');
-      container.innerHTML = imgs.map((src, i) => `
-        <img src="${src}" class="modal-img-full" alt="ภาพที่ ${i + 1}" onerror="this.onerror=null; this.src=FALLBACK_LOG_SVG;">
-      `).join('');
-
-      document.getElementById('modalImageTitle').innerText = `${log.buildingName} (${log.floor}) - ${imgs.length} รูป`;
-      document.getElementById('modalImageDesc').innerText = `${log.date} ${log.time} น. - ${log.details}`;
-      new bootstrap.Modal(document.getElementById('imageModal')).show();
-    }
-
-    // ==============================================
-    // 5. สร้างและดาวน์โหลดรายงานสรุป PDF
-    // ==============================================
-    let pdfModalInstance = null;
-
-    function openPdfForActiveBuilding() {
-      if (selectedBuilding) {
-        openPdfModal(selectedBuilding.id, selectedBuilding.name);
-      } else {
-        openPdfModal('ALL', 'ทุกอาคาร');
-      }
-    }
-
-    function openPdfModal(defaultBldId, defaultBldName) {
-      if (!pdfModalInstance) {
-        pdfModalInstance = new bootstrap.Modal(document.getElementById('pdfExportModal'));
-      }
-      const selectEl = document.getElementById('pdfBuildingSelect');
-      let opts = `<option value="ALL">ทุกอาคาร (ภาพรวมทั้งหมด)</option>`;
-      (buildingsList || []).forEach(b => {
-        opts += `<option value="${b.id}">${b.name}</option>`;
-      });
-      selectEl.innerHTML = opts;
-      selectEl.value = defaultBldId || 'ALL';
-
-      const curYear = String(new Date().getFullYear());
-      const yearSelect = document.getElementById('pdfYearSelect');
-      if ([...yearSelect.options].some(o => o.value === curYear)) {
-        yearSelect.value = curYear;
-      }
-
-      pdfModalInstance.show();
-    }
-
-    function downloadSummaryPdf() {
-      const bldSelect = document.getElementById('pdfBuildingSelect');
-      const buildingId = bldSelect.value;
-      const buildingName = buildingId === 'ALL' ? 'ทุกอาคาร' : bldSelect.options[bldSelect.selectedIndex].text;
-      const year = document.getElementById('pdfYearSelect').value;
-      const month = document.getElementById('pdfMonthSelect').value;
-
-      const btn = document.getElementById('btnGeneratePdf');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังสร้าง PDF...';
-
-      callGasApi('generateSummaryPdf', {
-          buildingId: buildingId,
-          buildingName: buildingName,
-          year: year,
-          month: month
-        })
-        .then(res => {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-download me-1"></i> สร้างไฟล์ PDF';
-
-          if (res.status === 'success' && res.base64Pdf) {
-            pdfModalInstance.hide();
-
-            const byteChars = atob(res.base64Pdf);
-            const byteNumbers = new Array(byteChars.length);
-            for (let i = 0; i < byteChars.length; i++) {
-              byteNumbers[i] = byteChars.charCodeAt(i);
-            }
-            const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
-            const blobUrl = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = res.fileName || 'รายงานสรุปงานช่าง.pdf';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-
-            Swal.fire({
-              icon: 'success',
-              title: 'สร้างไฟล์ PDF เรียบร้อยแล้ว',
-              html: `<p class="small text-muted mb-2">${res.fileName}</p>
-                     <a href="${blobUrl}" target="_blank" download="${res.fileName}" class="btn btn-danger rounded-pill px-4">
-                       <i class="fa-solid fa-file-pdf me-1"></i> เปิดดู / บันทึก PDF
-                     </a>`,
-              showConfirmButton: true,
-              confirmButtonText: 'ปิด',
-              confirmButtonColor: '#64748b'
-            });
-          } else {
-            Swal.fire({ icon: 'error', title: 'สร้าง PDF ไม่สำเร็จ', text: res.message || 'ไม่พบข้อมูล' });
-          }
-        })
-        .catch(err => {
-          btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-download me-1"></i> สร้างไฟล์ PDF';
-          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
-        });
-    }
-  </script>
+  <table class="kpi-table">
+    <tr>
+      <td><div>งานทั้งหมดที่ได้รับ</div><div class="kpi-num" style="color:#0f172a;">${totalCount}</div></td>
+      <td><div>รอดำเนินการ</div><div class="kpi-num" style="color:#d97706;">${pendingCount}</div></td>
+      <td><div>กำลังดำเนินการ</div><div class="kpi-num" style="color:#0284c7;">${inProgressCount}</div></td>
+      <td><div>เสร็จสิ้นแล้ว</div><div class="kpi-num" style="color:#16a34a;">${doneCount}</div></td>
+    </tr>
+  </table>
+
+  <div class="sec-title">1. สรุปยอดงานรายปี</div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>ปี</th>
+        <th>ทั้งหมด (งาน)</th>
+        <th>รอดำเนินการ</th>
+        <th>กำลังดำเนินการ</th>
+        <th>เสร็จสิ้นแล้ว</th>
+      </tr>
+    </thead>
+    <tbody>${yearRowsHtml}</tbody>
+  </table>
+
+  <div class="sec-title">2. สรุปยอดงานรายเดือน</div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="text-align:left;">เดือน / ปี</th>
+        <th>ทั้งหมด (งาน)</th>
+        <th>รอดำเนินการ</th>
+        <th>กำลังดำเนินการ</th>
+        <th>เสร็จสิ้นแล้ว</th>
+      </tr>
+    </thead>
+    <tbody>${monthRowsHtml}</tbody>
+  </table>
+
+  <div class="sec-title">3. สรุปยอดงานตามหัวข้อ (ประเภทงาน)</div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="text-align:left;">ประเภทงาน</th>
+        <th style="width:120px;">จำนวน (งาน)</th>
+      </tr>
+    </thead>
+    <tbody>${typeRowsHtml}</tbody>
+  </table>
+
+  <div class="sec-title">4. รายละเอียดงานทั้งหมด (${totalCount} รายการ)</div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:28px;">#</th>
+        <th style="width:68px;">วัน/เวลา</th>
+        <th style="width:75px;">อาคาร/ชั้น</th>
+        <th style="width:90px;">ประเภทงาน</th>
+        <th>รายละเอียดงาน</th>
+        <th style="width:95px;">ผู้ฝาก/ผู้ทำ</th>
+        <th style="width:68px;">สถานะ</th>
+      </tr>
+    </thead>
+    <tbody>${detailRowsHtml}</tbody>
+  </table>
 </body>
-</html>
+</html>`;
+
+    const fileName = `รายงานสรุปงานช่าง_${targetBuildingName}_${targetYear}_${targetMonth}.pdf`.replace(/\s+/g, "_");
+    const pdfBlob = HtmlService.createHtmlOutput(htmlReport).getAs(MimeType.PDF).setName(fileName);
+    const base64Pdf = Utilities.base64Encode(pdfBlob.getBytes());
+
+    return {
+      status: "success",
+      fileName: fileName,
+      base64Pdf: base64Pdf
+    };
+  } catch (error) {
+    return {
+      status: "error",
+      message: "ไม่สามารถสร้างไฟล์ PDF ได้: " + error.toString()
+    };
+  }
+}
