@@ -692,6 +692,41 @@
       font-size: 0.78rem;
     }
 
+    .urgency-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border-radius: 8px;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .urgency-high {
+      background: #dc2626;
+      color: #ffffff;
+    }
+
+    .urgency-med {
+      background: #ffedd5;
+      color: #c2410c;
+      border: 1px solid #fb923c;
+    }
+
+    .urgency-low {
+      background: #fef9c3;
+      color: #854d0e;
+      border: 1px solid #facc15;
+    }
+
+    .btn-add-photo-later {
+      font-size: 0.72rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-top: 4px;
+      width: 78px;
+    }
+
     .badge-type {
       background: #f0fdf4;
       color: #166534;
@@ -1040,6 +1075,17 @@
               </div>
             </div>
 
+            <!-- ระดับความเร่งด่วน -->
+            <div class="mb-3">
+              <label class="form-label" for="workUrgency"><i class="fa-solid fa-gauge-high me-1 text-danger"></i> ระดับความเร่งด่วนของงาน <span class="text-danger">*</span></label>
+              <select class="form-select" id="workUrgency" required>
+                <option value="" selected disabled>-- เลือกระดับความเร่งด่วน --</option>
+                <option value="ด่วนที่สุด">🔴 1. ด่วนที่สุด — กระทบงาน/ความปลอดภัย (แก้ไขทันที)</option>
+                <option value="ค่อนข้างมีผลกระทบ">🟠 2. ค่อนข้างมีผลกระทบ — ควรรีบดำเนินการในวันนี้</option>
+                <option value="ไม่เร่งด่วน (ว่างค่อยดู)">🟡 3. ไม่เร่งด่วน — มีเวลาว่างค่อยเข้ามาดูให้หน่อย</option>
+              </select>
+            </div>
+
             <!-- ชื่อผู้ฝากงาน -->
             <div class="mb-3">
               <label class="form-label" for="requesterName"><i class="fa-solid fa-user-pen me-1 text-primary"></i> ชื่อผู้ฝากงาน <span class="text-danger">*</span></label>
@@ -1160,6 +1206,7 @@
           <span class="badge bg-primary rounded-pill px-3 py-1" id="logCountBadge">0 รายการ</span>
         </div>
 
+        <input type="file" id="addPhotoExistingInput" accept="image/*" multiple style="display: none;" onchange="handleAddPhotoExistingSelected(event)">
         <div id="logsContainer"></div>
       </div>
 
@@ -1779,6 +1826,7 @@
         workType: document.getElementById('workType').value,
         contractor: contractorFinal,
         requesterName: document.getElementById('requesterName').value.trim(),
+        urgency: document.getElementById('workUrgency').value,
         workStatus: 'รอดำเนินการ',
         details: document.getElementById('details').value.trim()
       };
@@ -1992,6 +2040,64 @@
       typeCard.style.display = 'block';
     }
 
+    function getUrgencyBadgeHtml(urgency) {
+      if (!urgency) return '';
+      if (urgency === 'ด่วนที่สุด') {
+        return `<span class="urgency-badge urgency-high"><i class="fa-solid fa-fire"></i> ด่วนที่สุด</span>`;
+      } else if (urgency === 'ค่อนข้างมีผลกระทบ') {
+        return `<span class="urgency-badge urgency-med"><i class="fa-solid fa-circle-exclamation"></i> ค่อนข้างมีผลกระทบ</span>`;
+      } else {
+        return `<span class="urgency-badge urgency-low"><i class="fa-regular fa-clock"></i> ว่างค่อยเข้ามาดู</span>`;
+      }
+    }
+
+    let targetAddPhotoRowId = null;
+    function triggerAddPhotoToRow(rowId) {
+      targetAddPhotoRowId = rowId;
+      document.getElementById('addPhotoExistingInput').click();
+    }
+
+    function handleAddPhotoExistingSelected(event) {
+      const files = Array.from(event.target.files || []);
+      const rowId = targetAddPhotoRowId;
+      if (!files.length || !rowId) return;
+
+      Swal.fire({
+        title: `กำลังอัปโหลดรูปเพิ่ม (${files.length} รูป)...`,
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+      });
+
+      const compressedList = [];
+      let processed = 0;
+      files.forEach(file => {
+        compressImageFile(file, 1280, function(b64) {
+          compressedList.push(b64);
+          processed++;
+          if (processed === files.length) {
+            event.target.value = '';
+            callGasApi('addPhotosToWorkLog', { rowId: rowId, imagesBase64: compressedList })
+              .then(res => {
+                if (res.status === 'success') {
+                  const target = (window._currentLogsCache || []).find(l => l.rowId === rowId);
+                  if (target) {
+                    target.images = res.images || [];
+                    target.imageUrl = res.imageUrl || '';
+                  }
+                  renderFilteredLogs();
+                  Swal.fire({ icon: 'success', title: 'เพิ่มรูปภาพเรียบร้อยแล้ว', timer: 1500, showConfirmButton: false });
+                } else {
+                  Swal.fire({ icon: 'error', title: 'อัปโหลดไม่สำเร็จ', text: res.message });
+                }
+              })
+              .catch(err => {
+                Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
+              });
+          }
+        });
+      });
+    }
+
     function getElapsedDaysBadgeHtml(dateStr, status) {
       if (!dateStr || status === 'ดำเนินการเสร็จสิ้น') return '';
       const parts = String(dateStr).split('-');
@@ -2099,13 +2205,23 @@
         if (imgs.length > 0) {
           const extraBadge = imgs.length > 1 ? `<span class="thumb-count-badge">+${imgs.length - 1} รูป</span>` : '';
           imgTag = `
-            <div class="thumb-wrap-badge" onclick="openImageModalByIndex(${origIdx})" style="cursor:pointer;">
-              <img src="${imgs[0]}" class="log-img-thumb" alt="รูปหน้างาน" onerror="this.onerror=null; this.src=FALLBACK_LOG_SVG;">
-              ${extraBadge}
+            <div class="d-flex flex-column align-items-center flex-shrink-0">
+              <div class="thumb-wrap-badge" onclick="openImageModalByIndex(${origIdx})" style="cursor:pointer;">
+                <img src="${imgs[0]}" class="log-img-thumb" alt="รูปหน้างาน" onerror="this.onerror=null; this.src=FALLBACK_LOG_SVG;">
+                ${extraBadge}
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-add-photo-later" onclick="triggerAddPhotoToRow(${log.rowId})">
+                <i class="fa-solid fa-plus"></i> เพิ่มรูป
+              </button>
             </div>
           `;
         } else {
-          imgTag = `<div class="log-img-thumb d-flex align-items-center justify-content-center bg-light text-muted small">ไม่มีรูป</div>`;
+          imgTag = `
+            <div class="log-img-thumb d-flex flex-column align-items-center justify-content-center bg-light text-primary small" style="cursor:pointer; border: 1.5px dashed #93c5fd;" onclick="triggerAddPhotoToRow(${log.rowId})">
+              <i class="fa-solid fa-camera mb-1"></i>
+              <span style="font-size:0.72rem; font-weight:600;">+ เพิ่มรูป</span>
+            </div>
+          `;
         }
 
         const currentStatus = log.workStatus || 'กำลังดำเนินการ';
@@ -2119,6 +2235,7 @@
               <div class="d-flex flex-wrap gap-1 align-items-center">
                 <span class="badge-floor">${log.floor}</span>
                 <span class="badge-type">${log.workType}</span>
+                ${getUrgencyBadgeHtml(log.urgency)}
               </div>
               <div class="text-end">
                 <span class="text-primary fw-bold small d-block"><i class="fa-regular fa-clock me-1"></i>${log.time} น.</span>
