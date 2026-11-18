@@ -1293,7 +1293,7 @@
   <nav class="bottom-nav" id="bottomNav">
     <button class="nav-item-btn active" id="nav-btn-add" onclick="switchWorkspaceTab('add')">
       <i class="fa-solid fa-plus-circle"></i>
-      <span>ลงงานใหม่</span>
+      <span>ฝากงานช่างอาคาร</span>
     </button>
     <button class="nav-item-btn" id="nav-btn-history" onclick="switchWorkspaceTab('history')">
       <i class="fa-solid fa-clock-rotate-left"></i>
@@ -1567,7 +1567,7 @@
                 <span class="badge bg-primary-subtle text-primary rounded-pill me-1">วันนี้ ${bld.todayCount} งาน</span>
                 ${totalBadge}
               </div>
-              <span class="text-primary fw-semibold">เข้าลงงาน <i class="fa-solid fa-chevron-right ms-1"></i></span>
+              <span class="text-primary fw-semibold">ดูงาน / ฝากงาน <i class="fa-solid fa-chevron-right ms-1"></i></span>
             </div>
           </div>
         `;
@@ -1595,7 +1595,11 @@
 
       document.getElementById('headerHomeLeft').style.display = 'none';
       document.getElementById('headerBuildingLeft').style.display = 'block';
-      document.getElementById('headerRightTitle').innerHTML = `<span class="fw-bold text-warning">${bld.name}</span>`;
+      document.getElementById('headerRightTitle').innerHTML = `
+        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="switchWorkspaceTab('add'); window.scrollTo({top: 0, behavior: 'smooth'});">
+          <i class="fa-solid fa-plus me-1"></i> ฝากงานช่างอาคาร
+        </button>
+      `;
 
       document.getElementById('activeBldName').innerText = bld.name;
       document.getElementById('activeBldImg').src = bld.imageUrl || FALLBACK_BLD_SVG;
@@ -1606,7 +1610,7 @@
       if (calWrap) calWrap.style.display = 'none';
       const btnAll = document.getElementById('btnDateAll');
       if (btnAll) btnAll.className = 'btn btn-primary btn-sm rounded-pill px-3';
-      switchWorkspaceTab('add');
+      switchWorkspaceTab('history');
     }
 
     function goHome() {
