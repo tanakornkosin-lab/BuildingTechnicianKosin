@@ -12,13 +12,19 @@
 
   <style>
     :root {
-      --primary-color: #0284c7;
-      --primary-dark: #0369a1;
-      --bg-color: #f1f5f9;
-      --card-bg: #ffffff;
-      --text-main: #0f172a;
-      --text-muted: #64748b;
-      --border-color: #e2e8f0;
+      --primary-color: #58a6ff;
+      --primary-dark: #1f6feb;
+      --bg-color: #090c12;
+      --surface-1: #0d1117;
+      --card-bg: #161b22;
+      --card-bg-glass: rgba(22, 27, 34, 0.88);
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --border-color: rgba(240, 246, 252, 0.12);
+      --accent-green: #3fb950;
+      --accent-amber: #d29922;
+      --accent-red: #f85149;
+      --accent-purple: #8957e5;
     }
 
     * {
@@ -29,41 +35,63 @@
 
     body {
       background-color: var(--bg-color);
+      background-image:
+        radial-gradient(ellipse 80% 45% at 50% -10%, rgba(137, 87, 229, 0.22), transparent 65%),
+        radial-gradient(ellipse 60% 35% at 85% 25%, rgba(56, 189, 248, 0.10), transparent 60%);
+      background-attachment: fixed;
       color: var(--text-main);
-      padding-bottom: 90px;
+      padding-bottom: 92px;
       margin: 0;
     }
 
+    /* Override Bootstrap light utilities for cohesive Dark Theme */
+    .bg-white, .bg-light {
+      background-color: var(--card-bg) !important;
+      color: var(--text-main) !important;
+    }
+    .text-dark { color: var(--text-main) !important; }
+    .text-muted, .text-secondary { color: var(--text-muted) !important; }
+    .border { border-color: var(--border-color) !important; }
+    .btn-light {
+      background-color: #21262d !important;
+      border-color: #30363d !important;
+      color: var(--text-main) !important;
+    }
+    .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+
     /* Header Bar */
     .app-header {
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      color: white;
+      background: rgba(13, 17, 23, 0.86);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      color: var(--text-main);
       padding: 14px 16px;
       position: sticky;
       top: 0;
       z-index: 1000;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.12);
     }
 
     .app-header h1 {
-      font-size: 1.1rem;
-      font-weight: 600;
+      font-size: 1.08rem;
+      font-weight: 700;
       margin: 0;
       display: flex;
       align-items: center;
       gap: 8px;
+      letter-spacing: 0.2px;
     }
 
     .app-header .sub-date {
       font-size: 0.78rem;
-      color: #94a3b8;
+      color: var(--text-muted);
       margin-top: 2px;
     }
 
     .btn-back-home {
-      background: rgba(255, 255, 255, 0.14);
-      color: #ffffff;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(240, 246, 252, 0.08);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
       border-radius: 10px;
       padding: 6px 12px;
       font-size: 0.85rem;
@@ -75,18 +103,18 @@
     }
 
     .btn-back-home:active {
-      background: rgba(255, 255, 255, 0.25);
+      background: rgba(240, 246, 252, 0.16);
     }
 
     /* Building Cards (Home Screen) */
     .building-card {
-      background: var(--card-bg);
+      background: var(--card-bg-glass);
       border-radius: 16px;
       overflow: hidden;
       border: 1px solid var(--border-color);
-      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
       cursor: pointer;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
+      transition: transform 0.15s ease, border-color 0.15s ease;
       margin-bottom: 16px;
     }
 
@@ -95,13 +123,14 @@
     }
 
     .building-card.has-pending {
-      border: 1.5px solid #fca5a5;
-      box-shadow: 0 3px 10px rgba(220, 38, 38, 0.10);
+      border: 1.5px solid rgba(248, 81, 73, 0.65);
+      box-shadow: 0 8px 24px rgba(248, 81, 73, 0.14);
     }
 
     .bld-status-pending {
-      background: #dc2626;
-      color: #ffffff;
+      background: rgba(248, 81, 73, 0.18);
+      color: #ff7b72;
+      border: 1px solid rgba(248, 81, 73, 0.5);
       font-size: 0.75rem;
       font-weight: 700;
       padding: 3px 10px;
@@ -112,8 +141,9 @@
     }
 
     .bld-status-clear {
-      background: #dcfce7;
-      color: #15803d;
+      background: rgba(63, 185, 80, 0.15);
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.4);
       font-size: 0.75rem;
       font-weight: 600;
       padding: 3px 10px;
@@ -124,8 +154,9 @@
     }
 
     .bld-status-empty {
-      background: #f1f5f9;
-      color: #64748b;
+      background: rgba(139, 148, 158, 0.12);
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
       font-size: 0.75rem;
       font-weight: 600;
       padding: 3px 10px;
@@ -138,7 +169,7 @@
     .building-img-wrap {
       width: 100%;
       height: 155px;
-      background-color: #cbd5e1;
+      background-color: #ffffff;
       overflow: hidden;
     }
 
@@ -151,7 +182,7 @@
 
     .building-card-body {
       padding: 12px 16px 10px 16px;
-      background: #ffffff;
+      background: transparent;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -159,7 +190,7 @@
     }
 
     .building-title {
-      color: #0f172a;
+      color: var(--text-main);
       font-size: 1.3rem;
       font-weight: 700;
       margin: 0;
@@ -168,9 +199,9 @@
     }
 
     .btn-edit-building {
-      background: #f8fafc;
-      color: #334155;
-      border: 1px solid #cbd5e1;
+      background: rgba(240, 246, 252, 0.06);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
       border-radius: 20px;
       padding: 5px 12px;
       font-size: 0.82rem;
@@ -183,8 +214,7 @@
     }
 
     .btn-edit-building:hover, .btn-edit-building:active {
-      background: #e2e8f0;
-      color: #0f172a;
+      background: rgba(240, 246, 252, 0.14);
     }
 
     .building-card-footer {
@@ -192,14 +222,14 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: #ffffff;
-      border-top: 1px solid #f1f5f9;
+      background: rgba(13, 17, 23, 0.45);
+      border-top: 1px solid var(--border-color);
       font-size: 0.85rem;
     }
 
     /* Active Building Banner */
     .selected-building-banner {
-      background: #ffffff;
+      background: var(--card-bg-glass);
       border-radius: 14px;
       border: 1px solid var(--border-color);
       padding: 10px 12px;
@@ -207,7 +237,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
     }
 
     .selected-building-thumb {
@@ -216,28 +246,29 @@
       border-radius: 10px;
       object-fit: cover;
       flex-shrink: 0;
+      background: #ffffff;
       border: 1px solid var(--border-color);
     }
 
-    /* Status Summary Scorecard (3 columns + total header) */
+    /* Status Summary Scorecard (Octoverse Metric Grid Style) */
     .status-summary-card {
-      background: #ffffff;
+      background: linear-gradient(180deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.95) 100%);
       border-radius: 16px;
       border: 1px solid var(--border-color);
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
       overflow: hidden;
     }
 
     .status-summary-header {
-      background: #f8fafc;
-      padding: 9px 14px;
+      background: rgba(240, 246, 252, 0.03);
+      padding: 10px 14px;
       border-bottom: 1px solid var(--border-color);
       display: flex;
       justify-content: space-between;
       align-items: center;
       font-size: 0.85rem;
       font-weight: 700;
-      color: #334155;
+      color: var(--text-main);
     }
 
     .status-summary-grid {
@@ -247,33 +278,39 @@
     }
 
     .status-stat-col {
-      padding: 14px 6px;
+      padding: 16px 6px;
       cursor: pointer;
       transition: background 0.15s ease;
     }
 
+    .status-stat-col.border-start, .status-stat-col.border-end {
+      border-color: var(--border-color) !important;
+    }
+
     .status-stat-col:active {
-      background: #f1f5f9;
+      background: rgba(240, 246, 252, 0.05);
     }
 
     .stat-label {
-      font-size: 0.82rem;
+      font-size: 0.8rem;
       font-weight: 600;
       margin-bottom: 4px;
+      color: var(--text-muted) !important;
     }
 
     .stat-num {
-      font-size: 1.9rem;
+      font-size: 2.05rem;
       font-weight: 700;
       line-height: 1.1;
+      letter-spacing: -0.5px;
     }
 
     /* Work Type Summary Card */
     .type-summary-card {
-      background: #ffffff;
+      background: var(--card-bg-glass);
       border-radius: 16px;
       border: 1px solid var(--border-color);
-      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
       padding: 12px 14px;
     }
 
@@ -288,26 +325,26 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
+      background: rgba(240, 246, 252, 0.05);
+      border: 1px solid var(--border-color);
       border-radius: 20px;
       padding: 5px 11px;
       font-size: 0.8rem;
       font-weight: 600;
-      color: #334155;
+      color: var(--text-main);
       cursor: pointer;
       transition: all 0.15s ease;
     }
 
     .type-summary-chip.active {
-      background: #0284c7;
-      border-color: #0284c7;
+      background: var(--primary-dark);
+      border-color: var(--primary-color);
       color: #ffffff;
     }
 
     .type-summary-chip .count-pill {
-      background: #e2e8f0;
-      color: #0f172a;
+      background: rgba(88, 166, 255, 0.18);
+      color: #79c0ff;
       border-radius: 12px;
       padding: 1px 7px;
       font-size: 0.74rem;
@@ -321,8 +358,8 @@
 
     /* Interactive Calendar with Status Dots */
     .calendar-box {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
+      background: var(--surface-1);
+      border: 1px solid var(--border-color);
       border-radius: 12px;
       padding: 10px;
       margin-top: 10px;
@@ -337,15 +374,15 @@
     }
 
     .cal-nav-btn {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       width: 30px;
       height: 30px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: #334155;
+      color: var(--text-main);
       cursor: pointer;
     }
 
@@ -355,7 +392,7 @@
       text-align: center;
       font-size: 0.72rem;
       font-weight: 700;
-      color: #64748b;
+      color: var(--text-muted);
       margin-bottom: 4px;
     }
 
@@ -366,8 +403,8 @@
     }
 
     .cal-day-cell {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       min-height: 42px;
       padding: 4px 2px;
@@ -375,6 +412,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
+      color: var(--text-main);
       cursor: pointer;
       transition: all 0.12s ease;
     }
@@ -386,13 +424,13 @@
     }
 
     .cal-day-cell.today {
-      border-color: #0284c7;
-      background: #f0f9ff;
+      border-color: var(--primary-color);
+      background: rgba(88, 166, 255, 0.12);
     }
 
     .cal-day-cell.selected {
-      background: #0284c7;
-      border-color: #0284c7;
+      background: var(--primary-dark);
+      border-color: var(--primary-color);
       color: #ffffff;
     }
 
@@ -416,9 +454,9 @@
       display: inline-block;
     }
 
-    .dot-pending { background-color: #f59e0b; }
-    .dot-inprogress { background-color: #0284c7; }
-    .dot-done { background-color: #16a34a; }
+    .dot-pending { background-color: #f0883e; }
+    .dot-inprogress { background-color: #58a6ff; }
+    .dot-done { background-color: #3fb950; }
     .cal-day-cell.selected .dot-inprogress { background-color: #bae6fd; }
 
     .cal-legend {
@@ -427,7 +465,7 @@
       gap: 12px;
       margin-top: 8px;
       font-size: 0.72rem;
-      color: #475569;
+      color: var(--text-muted);
     }
 
     .cal-legend span {
@@ -438,12 +476,12 @@
 
     /* Step Card */
     .step-card {
-      background: var(--card-bg);
+      background: var(--card-bg-glass);
       border-radius: 14px;
       border: 1px solid var(--border-color);
       padding: 16px;
       margin-bottom: 14px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     }
 
     .step-header {
@@ -452,13 +490,14 @@
       gap: 10px;
       margin-bottom: 12px;
       font-weight: 600;
-      color: var(--primary-dark);
+      color: var(--primary-color);
       font-size: 1rem;
     }
 
     .step-badge {
-      background: #e0f2fe;
-      color: var(--primary-dark);
+      background: rgba(88, 166, 255, 0.16);
+      color: #79c0ff;
+      border: 1px solid rgba(88, 166, 255, 0.35);
       width: 26px;
       height: 26px;
       border-radius: 50%;
@@ -479,9 +518,9 @@
 
     .time-mode-btn {
       flex: 1;
-      border: 1px solid #cbd5e1;
-      background: #f8fafc;
-      color: #475569;
+      border: 1px solid var(--border-color);
+      background: var(--surface-1);
+      color: var(--text-muted);
       border-radius: 10px;
       padding: 8px 10px;
       font-size: 0.85rem;
@@ -495,30 +534,30 @@
     }
 
     .time-mode-btn.active-live {
-      background: #e0f2fe;
-      border-color: #0284c7;
-      color: #0369a1;
+      background: rgba(88, 166, 255, 0.15);
+      border-color: var(--primary-color);
+      color: #79c0ff;
     }
 
     .time-mode-btn.active-backdate {
-      background: #fef3c7;
-      border-color: #d97706;
-      color: #b45309;
+      background: rgba(210, 153, 34, 0.18);
+      border-color: var(--accent-amber);
+      color: #e3b341;
     }
 
     /* Camera Upload Box */
     .camera-box {
-      border: 2px dashed #93c5fd;
+      border: 1.5px dashed rgba(88, 166, 255, 0.45);
       border-radius: 12px;
       padding: 20px;
       text-align: center;
-      background: #f0f9ff;
+      background: rgba(88, 166, 255, 0.06);
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
     .camera-box:active {
-      background: #e0f2fe;
+      background: rgba(88, 166, 255, 0.14);
       transform: scale(0.99);
     }
 
@@ -548,9 +587,9 @@
       position: absolute;
       top: 10px;
       right: 10px;
-      background: rgba(15, 23, 42, 0.78);
+      background: rgba(13, 17, 23, 0.85);
       color: white;
-      border: none;
+      border: 1px solid var(--border-color);
       border-radius: 20px;
       padding: 6px 14px;
       font-size: 0.82rem;
@@ -570,7 +609,7 @@
       overflow: hidden;
       border: 1px solid var(--border-color);
       aspect-ratio: 1 / 1;
-      background: #f1f5f9;
+      background: var(--surface-1);
     }
 
     .multi-thumb-wrap img {
@@ -587,8 +626,8 @@
       width: 22px;
       height: 22px;
       border-radius: 50%;
-      border: none;
-      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--border-color);
+      background: rgba(13, 17, 23, 0.88);
       color: #ffffff;
       font-size: 0.72rem;
       display: flex;
@@ -606,32 +645,45 @@
       position: absolute;
       bottom: 4px;
       right: 4px;
-      background: rgba(15, 23, 42, 0.82);
+      background: rgba(13, 17, 23, 0.88);
       color: #ffffff;
       font-size: 0.7rem;
       font-weight: 700;
       padding: 1px 6px;
       border-radius: 8px;
+      border: 1px solid var(--border-color);
     }
 
     /* Form Controls */
     .form-label {
       font-size: 0.88rem;
       font-weight: 600;
-      color: #334155;
+      color: #c9d1d9;
       margin-bottom: 5px;
     }
 
     .form-control, .form-select {
+      background-color: var(--surface-1) !important;
+      color: var(--text-main) !important;
       border-radius: 10px;
-      border: 1px solid #cbd5e1;
+      border: 1px solid #30363d;
       padding: 10px 13px;
       font-size: 0.95rem;
     }
 
+    .form-control::placeholder {
+      color: #6e7681;
+    }
+
     .form-control:focus, .form-select:focus {
+      background-color: var(--surface-1) !important;
+      color: var(--text-main) !important;
       border-color: var(--primary-color);
-      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+    }
+
+    input[type="date"], input[type="time"] {
+      color-scheme: dark;
     }
 
     /* Bottom Navigation */
@@ -640,13 +692,14 @@
       bottom: 0;
       left: 0;
       right: 0;
-      background: #ffffff;
+      background: rgba(13, 17, 23, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-top: 1px solid var(--border-color);
       display: none;
       justify-content: space-around;
       padding: 8px 0;
       z-index: 1000;
-      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
     }
 
     .nav-item-btn {
@@ -675,17 +728,18 @@
 
     /* Log Card */
     .log-card {
-      background: white;
+      background: var(--card-bg-glass);
       border-radius: 14px;
       border: 1px solid var(--border-color);
       padding: 14px;
       margin-bottom: 12px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
     }
 
     .badge-floor {
-      background: #e0f2fe;
-      color: #0369a1;
+      background: rgba(88, 166, 255, 0.16);
+      color: #79c0ff;
+      border: 1px solid rgba(88, 166, 255, 0.35);
       font-weight: 600;
       padding: 4px 9px;
       border-radius: 8px;
@@ -703,20 +757,20 @@
     }
 
     .urgency-high {
-      background: #dc2626;
+      background: #da3633;
       color: #ffffff;
     }
 
     .urgency-med {
-      background: #ffedd5;
-      color: #c2410c;
-      border: 1px solid #fb923c;
+      background: rgba(240, 136, 62, 0.18);
+      color: #ffa657;
+      border: 1px solid rgba(240, 136, 62, 0.5);
     }
 
     .urgency-low {
-      background: #fef9c3;
-      color: #854d0e;
-      border: 1px solid #facc15;
+      background: rgba(210, 153, 34, 0.18);
+      color: #e3b341;
+      border: 1px solid rgba(210, 153, 34, 0.45);
     }
 
     .btn-add-photo-later {
@@ -728,13 +782,13 @@
     }
 
     .badge-type {
-      background: #f0fdf4;
-      color: #166534;
+      background: rgba(63, 185, 80, 0.15);
+      color: #3fb950;
       font-weight: 600;
       padding: 4px 9px;
       border-radius: 8px;
       font-size: 0.78rem;
-      border: 1px solid #bbf7d0;
+      border: 1px solid rgba(63, 185, 80, 0.35);
     }
 
     /* Status Badges & Controls */
@@ -749,21 +803,21 @@
     }
 
     .status-pending {
-      background: #fef3c7;
-      color: #b45309;
-      border: 1px solid #fde68a;
+      background: rgba(210, 153, 34, 0.18);
+      color: #e3b341;
+      border: 1px solid rgba(210, 153, 34, 0.45);
     }
 
     .status-inprogress {
-      background: #e0f2fe;
-      color: #0369a1;
-      border: 1px solid #bae6fd;
+      background: rgba(88, 166, 255, 0.16);
+      color: #79c0ff;
+      border: 1px solid rgba(88, 166, 255, 0.4);
     }
 
     .status-done {
-      background: #dcfce7;
-      color: #15803d;
-      border: 1px solid #bbf7d0;
+      background: rgba(63, 185, 80, 0.16);
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.4);
     }
 
     .days-badge {
@@ -777,27 +831,27 @@
     }
 
     .days-today {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #cbd5e1;
+      background: rgba(139, 148, 158, 0.15);
+      color: #c9d1d9;
+      border: 1px solid var(--border-color);
     }
 
     .days-warn {
-      background: #ffedd5;
-      color: #c2410c;
-      border: 1px solid #fed7aa;
+      background: rgba(240, 136, 62, 0.18);
+      color: #ffa657;
+      border: 1px solid rgba(240, 136, 62, 0.45);
     }
 
     .days-danger {
-      background: #fee2e2;
-      color: #b91c1c;
-      border: 1px solid #fecaca;
+      background: rgba(248, 81, 73, 0.2);
+      color: #ff7b72;
+      border: 1px solid rgba(248, 81, 73, 0.5);
     }
 
     .status-update-bar {
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px dashed #e2e8f0;
+      border-top: 1px dashed var(--border-color);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -806,12 +860,12 @@
 
     .status-select-sm {
       border-radius: 8px;
-      border: 1px solid #cbd5e1;
+      border: 1px solid #30363d;
       padding: 5px 10px;
       font-size: 0.82rem;
       font-weight: 600;
-      background-color: #f8fafc;
-      color: #0f172a;
+      background-color: var(--surface-1);
+      color: var(--text-main);
       max-width: 195px;
     }
 
@@ -824,9 +878,9 @@
     }
 
     .status-filter-btn {
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
-      color: #475569;
+      border: 1px solid var(--border-color);
+      background: var(--surface-1);
+      color: var(--text-muted);
       border-radius: 20px;
       padding: 4px 12px;
       font-size: 0.78rem;
@@ -836,9 +890,9 @@
     }
 
     .status-filter-btn.active {
-      background: #0f172a;
-      color: #ffffff;
-      border-color: #0f172a;
+      background: #f0f6fc;
+      color: #0d1117;
+      border-color: #f0f6fc;
     }
 
     .log-img-thumb {
@@ -851,21 +905,27 @@
       flex-shrink: 0;
     }
 
+    .modal-content {
+      background-color: var(--card-bg) !important;
+      color: var(--text-main) !important;
+      border: 1px solid var(--border-color) !important;
+    }
+
     .modal-img-full {
       width: 100%;
       border-radius: 10px;
     }
 
     .btn-submit {
-      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-      color: white;
+      background: linear-gradient(135deg, #f0f6fc 0%, #d0d7de 100%);
+      color: #0d1117;
       border-radius: 12px;
       padding: 14px;
       font-size: 1.05rem;
-      font-weight: 600;
+      font-weight: 700;
       border: none;
       width: 100%;
-      box-shadow: 0 4px 10px rgba(2, 132, 199, 0.28);
+      box-shadow: 0 4px 16px rgba(240, 246, 252, 0.16);
     }
 
     .btn-submit:disabled {
@@ -879,6 +939,22 @@
       object-fit: cover;
       border-radius: 12px;
       border: 1px solid var(--border-color);
+    }
+
+    /* Dark Theme for SweetAlert2 */
+    .swal2-popup {
+      background: #161b22 !important;
+      color: #f0f6fc !important;
+      border: 1px solid rgba(240, 246, 252, 0.15) !important;
+      border-radius: 16px !important;
+    }
+    .swal2-title, .swal2-html-container {
+      color: #f0f6fc !important;
+    }
+    .swal2-input {
+      background: #0d1117 !important;
+      color: #f0f6fc !important;
+      border: 1px solid #30363d !important;
     }
   </style>
 </head>
@@ -978,7 +1054,7 @@
               <span class="badge bg-success"><i class="fa-solid fa-circle-dot me-1"></i> บันทึกสดหน้างาน</span>
             </div>
 
-            <div id="backdateTimeBox" class="p-2 rounded bg-warning-subtle border border-warning-subtle" style="display: none;">
+            <div id="backdateTimeBox" class="p-2 rounded border" style="display: none;">
               <div class="row g-2">
                 <div class="col-7">
                   <label class="form-label mb-1 small" for="customDate">วันที่ทำงาน <span class="text-danger">*</span></label>
@@ -1123,16 +1199,16 @@
           </div>
           <div class="status-summary-grid">
             <div class="status-stat-col" onclick="setStatusFilter('รอดำเนินการ', document.getElementById('filterPillPending'))">
-              <div class="stat-label" style="color: #b45309;">รอดำเนินการ</div>
-              <div class="stat-num" style="color: #d97706;" id="sumPending">0</div>
+              <div class="stat-label" style="color: #8b949e;">รอดำเนินการ</div>
+              <div class="stat-num" style="color: #e3b341;" id="sumPending">0</div>
             </div>
             <div class="status-stat-col border-start border-end" onclick="setStatusFilter('กำลังดำเนินการ', document.getElementById('filterPillInProgress'))">
-              <div class="stat-label" style="color: #0369a1;">กำลังดำเนินการ</div>
-              <div class="stat-num" style="color: #0284c7;" id="sumInProgress">0</div>
+              <div class="stat-label" style="color: #8b949e;">กำลังดำเนินการ</div>
+              <div class="stat-num" style="color: #58a6ff;" id="sumInProgress">0</div>
             </div>
             <div class="status-stat-col" onclick="setStatusFilter('ดำเนินการเสร็จสิ้น', document.getElementById('filterPillDone'))">
-              <div class="stat-label" style="color: #15803d;">เสร็จสิ้นแล้ว</div>
-              <div class="stat-num" style="color: #16a34a;" id="sumDone">0</div>
+              <div class="stat-label" style="color: #8b949e;">เสร็จสิ้นแล้ว</div>
+              <div class="stat-num" style="color: #3fb950;" id="sumDone">0</div>
             </div>
           </div>
         </div>
