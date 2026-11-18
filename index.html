@@ -94,6 +94,47 @@
       transform: scale(0.985);
     }
 
+    .building-card.has-pending {
+      border: 1.5px solid #fca5a5;
+      box-shadow: 0 3px 10px rgba(220, 38, 38, 0.10);
+    }
+
+    .bld-status-pending {
+      background: #dc2626;
+      color: #ffffff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .bld-status-clear {
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .bld-status-empty {
+      background: #f1f5f9;
+      color: #64748b;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
     .building-img-wrap {
       width: 100%;
       height: 155px;
@@ -1364,16 +1405,36 @@
         return;
       }
 
+      // เรียงลำดับอาคารที่มีงานมากสุดอยู่ด้านบน (จากมากไปน้อย)
+      const sortedBuildings = [...buildingsList].sort((a, b) => (b.totalCount - a.totalCount) || ((b.pendingCount || 0) - (a.pendingCount || 0)));
+
       let html = '';
-      buildingsList.forEach(bld => {
+      sortedBuildings.forEach(bld => {
         const safeImg = bld.imageUrl || FALLBACK_BLD_SVG;
+        const pendingCount = Number(bld.pendingCount || 0);
+        const hasPending = pendingCount > 0;
+
+        let statusTag = `<span class="bld-status-empty"><i class="fa-regular fa-circle"></i> ไม่มีงาน</span>`;
+        if (hasPending) {
+          statusTag = `<span class="bld-status-pending"><i class="fa-solid fa-circle-exclamation"></i> มีงานค้าง ${pendingCount} งาน</span>`;
+        } else if (bld.totalCount > 0) {
+          statusTag = `<span class="bld-status-clear"><i class="fa-solid fa-circle-check"></i> เสร็จครบแล้ว</span>`;
+        }
+
+        const totalBadge = hasPending
+          ? `<span class="badge bg-danger text-white rounded-pill">สะสม ${bld.totalCount} งาน (ค้าง ${pendingCount})</span>`
+          : `<span class="badge bg-light text-secondary border rounded-pill">สะสม ${bld.totalCount} งาน</span>`;
+
         html += `
-          <div class="building-card" onclick="selectBuilding('${bld.id}')">
+          <div class="building-card ${hasPending ? 'has-pending' : ''}" onclick="selectBuilding('${bld.id}')">
             <div class="building-img-wrap">
               <img src="${safeImg}" alt="${bld.name}" onerror="this.onerror=null; this.src=FALLBACK_BLD_SVG;">
             </div>
             <div class="building-card-body">
-              <h4 class="building-title"><i class="fa-solid fa-building text-primary me-2" style="font-size:1.05rem;"></i>${bld.name}</h4>
+              <div>
+                <h4 class="building-title mb-1"><i class="fa-solid fa-building text-primary me-2" style="font-size:1.05rem;"></i>${bld.name}</h4>
+                ${statusTag}
+              </div>
               <button type="button" class="btn-edit-building" onclick="event.stopPropagation(); openEditBuildingModal('${bld.id}')">
                 <i class="fa-solid fa-pen text-primary"></i> แก้ไข
               </button>
@@ -1381,7 +1442,7 @@
             <div class="building-card-footer">
               <div>
                 <span class="badge bg-primary-subtle text-primary rounded-pill me-1">วันนี้ ${bld.todayCount} งาน</span>
-                <span class="badge bg-light text-secondary border rounded-pill">สะสม ${bld.totalCount} งาน</span>
+                ${totalBadge}
               </div>
               <span class="text-primary fw-semibold">เข้าลงงาน <i class="fa-solid fa-chevron-right ms-1"></i></span>
             </div>
