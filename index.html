@@ -842,6 +842,37 @@
       border: 1px solid rgba(240, 136, 62, 0.45);
     }
 
+    .days-done {
+      background: rgba(63, 185, 80, 0.14);
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.35);
+    }
+
+    .activity-item {
+      border-left: 2px solid #30363d;
+      padding: 0 0 14px 14px;
+      margin-left: 6px;
+      position: relative;
+    }
+
+    .activity-item:last-child {
+      border-left-color: transparent;
+      padding-bottom: 4px;
+    }
+
+    .activity-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      position: absolute;
+      left: -6px;
+      top: 4px;
+    }
+
+    .act-dot-new { background: #58a6ff; box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2); }
+    .act-dot-done { background: #3fb950; box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.2); }
+    .act-dot-prog { background: #e3b341; box-shadow: 0 0 0 3px rgba(227, 179, 65, 0.2); }
+
     .days-danger {
       background: rgba(248, 81, 73, 0.2);
       color: #ff7b72;
@@ -1360,6 +1391,24 @@
     </div>
   </div>
 
+  <!-- Modal ประวัติความเคลื่อนไหวล่าสุด (ล่าสุด -> อดีต) -->
+  <div class="modal fade" id="activityLogModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content border-0 rounded-4">
+        <div class="modal-header border-0 pb-2">
+          <div>
+            <h5 class="modal-title fw-bold mb-0"><i class="fa-solid fa-clock-rotate-left text-primary me-2"></i>ประวัติความเคลื่อนไหวล่าสุด</h5>
+            <small class="text-muted" id="activityScopeLabel">เรียงจากล่าสุดไปอดีต</small>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body pt-2" id="activityFeedBody">
+          <div class="text-center py-4 text-muted">กำลังโหลดประวัติ...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal สร้างและดาวน์โหลดรายงานสรุป PDF -->
   <div class="modal fade" id="pdfExportModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -1521,7 +1570,14 @@
     function renderBuildings() {
       const container = document.getElementById('buildingsList');
       const headerCount = document.getElementById('headerRightTitle');
-      headerCount.innerHTML = `<span class="badge bg-primary px-2 py-1"><i class="fa-solid fa-building me-1"></i> ${buildingsList.length} อาคาร</span>`;
+      headerCount.innerHTML = `
+        <div class="d-flex align-items-center gap-1">
+          <button type="button" class="btn btn-outline-light btn-sm rounded-pill px-2 py-1" style="font-size:0.78rem;" onclick="openActivityModal('ALL')">
+            <i class="fa-solid fa-bell text-warning me-1"></i> ประวัติ
+          </button>
+          <span class="badge bg-primary px-2 py-1"><i class="fa-solid fa-building me-1"></i> ${buildingsList.length}</span>
+        </div>
+      `;
 
       if (buildingsList.length === 0) {
         container.innerHTML = `<div class="text-center py-5 text-muted">ยังไม่มีข้อมูลอาคาร กด "เพิ่มอาคาร" ด้านบน</div>`;
@@ -1596,9 +1652,14 @@
       document.getElementById('headerHomeLeft').style.display = 'none';
       document.getElementById('headerBuildingLeft').style.display = 'block';
       document.getElementById('headerRightTitle').innerHTML = `
-        <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 fw-bold" onclick="switchWorkspaceTab('add'); window.scrollTo({top: 0, behavior: 'smooth'});">
-          <i class="fa-solid fa-plus me-1"></i> ฝากงานช่างอาคาร
-        </button>
+        <div class="d-flex align-items-center gap-1">
+          <button type="button" class="btn btn-outline-light btn-sm rounded-pill px-2 py-1" style="font-size:0.78rem;" onclick="openActivityModal('CURRENT')">
+            <i class="fa-solid fa-bell text-warning me-1"></i> ประวัติ
+          </button>
+          <button type="button" class="btn btn-primary btn-sm rounded-pill px-2 py-1 fw-bold" style="font-size:0.78rem;" onclick="switchWorkspaceTab('add'); window.scrollTo({top: 0, behavior: 'smooth'});">
+            <i class="fa-solid fa-plus me-1"></i> ฝากงาน
+          </button>
+        </div>
       `;
 
       document.getElementById('activeBldName').innerText = bld.name;
@@ -2178,12 +2239,27 @@
       });
     }
 
-    function getElapsedDaysBadgeHtml(dateStr, status) {
-      if (!dateStr || status === 'ดำเนินการเสร็จสิ้น') return '';
+    function getElapsedDaysBadgeHtml(dateStr, status, statusUpdatedAt) {
+      if (!dateStr) return '';
       const parts = String(dateStr).split('-');
       if (parts.length !== 3) return '';
-
       const jobDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+
+      if (status === 'ดำเนินการเสร็จสิ้น') {
+        let endDate = new Date();
+        if (statusUpdatedAt) {
+          const uDateStr = String(statusUpdatedAt).split(' ')[0];
+          const uParts = uDateStr.split('-');
+          if (uParts.length === 3) {
+            endDate = new Date(Number(uParts[0]), Number(uParts[1]) - 1, Number(uParts[2]));
+          }
+        }
+        const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+        const usedDays = Math.max(0, Math.floor((endDay - jobDate) / (1000 * 60 * 60 * 24)));
+        const labelText = usedDays === 0 ? 'เสร็จภายในวัน (0 วัน)' : `ใช้เวลา ${usedDays} วัน`;
+        return `<span class="days-badge days-done"><i class="fa-solid fa-stopwatch"></i> ${labelText}</span>`;
+      }
+
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const diffDays = Math.floor((today - jobDate) / (1000 * 60 * 60 * 24));
@@ -2306,7 +2382,7 @@
 
         const currentStatus = log.workStatus || 'กำลังดำเนินการ';
         const statusBadge = getStatusBadgeHtml(currentStatus);
-        const elapsedBadge = getElapsedDaysBadgeHtml(log.date, currentStatus);
+        const elapsedBadge = getElapsedDaysBadgeHtml(log.date, currentStatus, log.statusUpdatedAt);
         const updatedInfo = log.statusUpdatedAt ? `<small class="text-muted d-block" style="font-size:0.7rem;">อัปเดต: ${log.statusUpdatedAt}</small>` : '';
 
         html += `
@@ -2520,6 +2596,113 @@
           btn.innerHTML = '<i class="fa-solid fa-download me-1"></i> สร้างไฟล์ PDF';
           Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
         });
+    }
+
+    // ==============================================
+    // 6. แท็บประวัติความเคลื่อนไหวล่าสุด (ล่าสุด -> อดีต)
+    // ==============================================
+    let activityModalInstance = null;
+
+    function openActivityModal(scope) {
+      if (!activityModalInstance) {
+        activityModalInstance = new bootstrap.Modal(document.getElementById('activityLogModal'));
+      }
+      const body = document.getElementById('activityFeedBody');
+      const scopeLabel = document.getElementById('activityScopeLabel');
+
+      const useCurrent = (scope === 'CURRENT' && selectedBuilding);
+      scopeLabel.innerText = useCurrent
+        ? `ความเคลื่อนไหวอาคาร ${selectedBuilding.name} (ล่าสุด → อดีต)`
+        : `ความเคลื่อนไหวทุกอาคาร (ล่าสุด → อดีต)`;
+
+      body.innerHTML = `
+        <div class="text-center py-4 text-muted">
+          <div class="spinner-border text-primary spinner-border-sm me-2"></div> กำลังโหลดประวัติ...
+        </div>
+      `;
+      activityModalInstance.show();
+
+      const buildFeed = (logs) => {
+        const events = [];
+        (logs || []).forEach(l => {
+          const createdTs = `${l.date || ''} ${l.time || '00:00'}`;
+          events.push({
+            ts: createdTs,
+            type: 'NEW',
+            title: `ฝากงานใหม่${l.requesterName ? ' โดย ' + l.requesterName : ''}`,
+            building: l.buildingName,
+            floor: l.floor,
+            workType: l.workType,
+            details: l.details
+          });
+
+          if (l.statusUpdatedAt && l.workStatus && l.workStatus !== 'รอดำเนินการ') {
+            events.push({
+              ts: l.statusUpdatedAt,
+              type: l.workStatus === 'ดำเนินการเสร็จสิ้น' ? 'DONE' : 'PROG',
+              title: l.workStatus === 'ดำเนินการเสร็จสิ้น' ? 'ดำเนินการเสร็จสิ้นแล้ว' : `อัปเดตสถานะ: ${l.workStatus}`,
+              building: l.buildingName,
+              floor: l.floor,
+              workType: l.workType,
+              details: l.details
+            });
+          }
+        });
+
+        events.sort((a, b) => b.ts.localeCompare(a.ts));
+        const recent = events.slice(0, 40);
+
+        if (recent.length === 0) {
+          body.innerHTML = `<div class="text-center py-4 text-muted">ยังไม่มีประวัติความเคลื่อนไหว</div>`;
+          return;
+        }
+
+        body.innerHTML = recent.map(ev => {
+          let dotCls = 'act-dot-new';
+          let badgeHtml = `<span class="badge bg-primary-subtle text-primary" style="font-size:0.72rem;">ฝากงานใหม่</span>`;
+          if (ev.type === 'DONE') {
+            dotCls = 'act-dot-done';
+            badgeHtml = `<span class="badge bg-success-subtle text-success" style="font-size:0.72rem;">เสร็จสิ้นแล้ว</span>`;
+          } else if (ev.type === 'PROG') {
+            dotCls = 'act-dot-prog';
+            badgeHtml = `<span class="badge bg-warning-subtle text-warning" style="font-size:0.72rem;">กำลังดำเนินการ</span>`;
+          }
+          return `
+            <div class="activity-item">
+              <span class="activity-dot ${dotCls}"></span>
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                ${badgeHtml}
+                <small class="text-muted" style="font-size:0.74rem;">${ev.ts}</small>
+              </div>
+              <div class="fw-semibold text-dark" style="font-size:0.86rem;">
+                ${ev.title} <span class="text-primary">• ${ev.building} (${ev.floor})</span>
+              </div>
+              <div class="text-muted small" style="font-size:0.82rem;">${ev.details}</div>
+            </div>
+          `;
+        }).join('');
+      };
+
+      if (useCurrent && window._currentLogsCache) {
+        buildFeed(window._currentLogsCache);
+        return;
+      }
+
+      callGasApi('getWorkLogs', {
+        buildingId: useCurrent ? selectedBuilding.id : 'ALL',
+        buildingName: useCurrent ? selectedBuilding.name : '',
+        date: 'ALL'
+      })
+      .then(res => {
+        if (res.status === 'success') {
+          buildFeed(res.logs || []);
+        } else {
+          body.innerHTML = `<div class="alert alert-danger">${res.message}</div>`;
+        }
+      })
+      .catch(err => {
+        body.innerHTML = `<div class="alert alert-danger">โหลดประวัติไม่สำเร็จ: ${err.message || err}</div>`;
+      });
     }
   </script>
 </body>
