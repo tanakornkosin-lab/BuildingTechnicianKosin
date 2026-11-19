@@ -1,0 +1,16 @@
+{
+  "name": "ระบบติดตามงานช่างอาคาร",
+  "short_name": "งานช่างอาคาร",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#090c12",
+  "theme_color": "#090c12",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
