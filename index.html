@@ -842,6 +842,34 @@
       border: 1px solid rgba(240, 136, 62, 0.45);
     }
 
+    .cost-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(63, 185, 80, 0.14);
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.35);
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .cost-badge-empty {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(139, 148, 158, 0.12);
+      color: #8b949e;
+      border: 1px dashed rgba(139, 148, 158, 0.4);
+      padding: 2px 9px;
+      border-radius: 12px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
     .days-done {
       background: rgba(63, 185, 80, 0.14);
       color: #3fb950;
@@ -1199,6 +1227,12 @@
               <input type="text" class="form-control" id="requesterName" placeholder="ระบุชื่อผู้แจ้ง / ผู้ฝากงาน..." required>
             </div>
 
+            <!-- จำนวนเงินที่ใช้ในงานนี้ (ไม่บังคับ) -->
+            <div class="mb-3">
+              <label class="form-label" for="workCost"><i class="fa-solid fa-baht-sign me-1 text-success"></i> จำนวนเงินที่ใช้ในงานนี้ (บาท) <small class="text-muted fw-normal">(ไม่บังคับ — ใส่เพิ่มทีหลังได้)</small></label>
+              <input type="number" step="0.01" min="0" class="form-control" id="workCost" placeholder="เช่น 1500 หรือเว้นว่างไว้หากยังไม่ทราบราคา">
+            </div>
+
             <!-- รายละเอียดงาน -->
             <div class="mb-2">
               <label class="form-label" for="details"><i class="fa-solid fa-list-check me-1 text-primary"></i> รายละเอียดงานที่ทำ ณ เวลานั้น <span class="text-danger">*</span></label>
@@ -1241,6 +1275,10 @@
               <div class="stat-label" style="color: #8b949e;">เสร็จสิ้นแล้ว</div>
               <div class="stat-num" style="color: #3fb950;" id="sumDone">0</div>
             </div>
+          </div>
+          <div class="px-3 py-2 border-top d-flex justify-content-between align-items-center" style="background: rgba(63, 185, 80, 0.06); font-size: 0.84rem;">
+            <span class="text-muted"><i class="fa-solid fa-coins text-success me-1"></i> ค่าใช้จ่ายรวม</span>
+            <strong style="color: #3fb950;" id="sumTotalCost">0 บาท</strong>
           </div>
         </div>
 
@@ -1968,6 +2006,7 @@
         contractor: contractorFinal,
         requesterName: document.getElementById('requesterName').value.trim(),
         urgency: document.getElementById('workUrgency').value,
+        cost: document.getElementById('workCost').value.trim(),
         workStatus: 'รอดำเนินการ',
         details: document.getElementById('details').value.trim()
       };
@@ -2144,6 +2183,9 @@
       document.getElementById('sumPending').innerText = pending;
       document.getElementById('sumInProgress').innerText = inProgress;
       document.getElementById('sumDone').innerText = done;
+      const totalCost = allLogs.reduce((acc, l) => acc + (Number(l.cost) || 0), 0);
+      const costEl = document.getElementById('sumTotalCost');
+      if (costEl) costEl.innerText = `${totalCost.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`;
 
       // 2. สรุปยอดแต่ละหัวข้อ (ประเภทงาน)
       const typeCard = document.getElementById('typeSummaryCard');
@@ -2406,8 +2448,13 @@
                 <div class="text-muted small mb-1">
                   <i class="fa-solid fa-user-tag me-1"></i> ผู้ปฏิบัติงาน: <strong>${log.contractor}</strong>
                 </div>
-                <div class="text-dark" style="font-size: 0.94rem; line-height: 1.45;">
+                <div class="text-dark mb-1" style="font-size: 0.94rem; line-height: 1.45;">
                   ${log.details}
+                </div>
+                <div>
+                  ${(log.cost !== "" && log.cost !== null && log.cost !== undefined && Number(log.cost) > 0)
+                    ? `<span class="cost-badge" onclick="editWorkCost(${log.rowId})"><i class="fa-solid fa-baht-sign"></i> ${Number(log.cost).toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท <i class="fa-solid fa-pen ms-1" style="font-size:0.65rem;"></i></span>`
+                    : `<span class="cost-badge-empty" onclick="editWorkCost(${log.rowId})"><i class="fa-solid fa-plus"></i> ระบุค่าใช้จ่าย</span>`}
                 </div>
               </div>
             </div>
@@ -2483,6 +2530,57 @@
         .catch(err => {
           selectEl.disabled = false;
           selectEl.value = oldStatus;
+          Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
+        });
+    }
+
+
+    async function editWorkCost(rowId) {
+      const target = (window._currentLogsCache || []).find(l => l.rowId === rowId);
+      const currentVal = (target && target.cost !== "" && target.cost !== undefined) ? target.cost : "";
+
+      const resModal = await Swal.fire({
+        title: 'ระบุจำนวนเงินที่ใช้ (บาท)',
+        html: `
+          <div class="text-start mb-2">
+            <label class="form-label small">จำนวนเงิน (บาท)</label>
+            <input type="number" id="swalCostInput" class="form-control" step="0.01" min="0" value="${currentVal}" placeholder="เช่น 1500">
+          </div>
+          <div class="text-start">
+            <label class="form-label small">รหัสผ่านเพื่อยืนยัน</label>
+            <input type="password" id="swalCostPin" class="form-control" inputmode="numeric" placeholder="กรอกรหัสผ่าน...">
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'บันทึก',
+        cancelButtonText: 'ยกเลิก',
+        confirmButtonColor: '#0284c7',
+        preConfirm: () => {
+          const cost = document.getElementById('swalCostInput').value.trim();
+          const pin = document.getElementById('swalCostPin').value.trim();
+          if (!pin) {
+            Swal.showValidationMessage('กรุณากรอกรหัสผ่าน');
+            return false;
+          }
+          return { cost: cost, pin: pin };
+        }
+      });
+
+      if (!resModal.isConfirmed || !resModal.value) return;
+
+      Swal.fire({ title: 'กำลังบันทึกค่าใช้จ่าย...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+      callGasApi('updateWorkCost', { rowId: rowId, cost: resModal.value.cost, pin: resModal.value.pin })
+        .then(res => {
+          if (res.status === 'success') {
+            if (target) target.cost = res.cost;
+            renderFilteredLogs();
+            Swal.fire({ icon: 'success', title: 'บันทึกค่าใช้จ่ายแล้ว', timer: 1400, showConfirmButton: false });
+          } else {
+            Swal.fire({ icon: 'error', title: 'ไม่สำเร็จ', text: res.message });
+          }
+        })
+        .catch(err => {
           Swal.fire({ icon: 'error', title: 'เชื่อมต่อล้มเหลว', text: err.message || err.toString() });
         });
     }
