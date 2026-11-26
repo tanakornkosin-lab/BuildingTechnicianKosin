@@ -8,9 +8,9 @@
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" sizes="180x180" href="icon.png">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#090c12">
+  <meta name="theme-color" content="#f4f7ff">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="งานช่างอาคาร">
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -20,19 +20,20 @@
 
   <style>
     :root {
-      --primary-color: #58a6ff;
-      --primary-dark: #1f6feb;
-      --bg-color: #090c12;
-      --surface-1: #0d1117;
-      --card-bg: #161b22;
-      --card-bg-glass: rgba(22, 27, 34, 0.88);
-      --text-main: #f0f6fc;
-      --text-muted: #8b949e;
-      --border-color: rgba(240, 246, 252, 0.12);
-      --accent-green: #3fb950;
-      --accent-amber: #d29922;
-      --accent-red: #f85149;
-      --accent-purple: #8957e5;
+      --primary-color: #6366f1;
+      --primary-dark: #4f46e5;
+      --sky-accent: #3b82f6;
+      --bg-color: #f4f7ff;
+      --surface-1: #f8fafc;
+      --card-bg: #ffffff;
+      --card-bg-glass: rgba(255, 255, 255, 0.88);
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border-color: rgba(148, 163, 184, 0.24);
+      --shadow-soft: 0 8px 28px rgba(99, 102, 241, 0.08), 0 2px 6px rgba(15, 23, 42, 0.04);
+      --accent-green: #16a34a;
+      --accent-amber: #d97706;
+      --accent-red: #ef4444;
     }
 
     * {
@@ -44,37 +45,25 @@
     body {
       background-color: var(--bg-color);
       background-image:
-        radial-gradient(ellipse 80% 45% at 50% -10%, rgba(137, 87, 229, 0.22), transparent 65%),
-        radial-gradient(ellipse 60% 35% at 85% 25%, rgba(56, 189, 248, 0.10), transparent 60%);
+        radial-gradient(ellipse 75% 45% at 15% -5%, rgba(147, 197, 253, 0.55), transparent 60%),
+        radial-gradient(ellipse 65% 45% at 90% 5%, rgba(196, 181, 253, 0.50), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 85% 90%, rgba(254, 215, 170, 0.42), transparent 60%),
+        radial-gradient(ellipse 60% 40% at 10% 85%, rgba(187, 247, 208, 0.38), transparent 60%);
       background-attachment: fixed;
       color: var(--text-main);
-      padding-bottom: 92px;
+      padding-bottom: 94px;
       margin: 0;
     }
 
-    /* Override Bootstrap light utilities for cohesive Dark Theme */
-    .bg-white, .bg-light {
-      background-color: var(--card-bg) !important;
-      color: var(--text-main) !important;
-    }
-    .text-dark { color: var(--text-main) !important; }
-    .text-muted, .text-secondary { color: var(--text-muted) !important; }
-    .border { border-color: var(--border-color) !important; }
-    .btn-light {
-      background-color: #21262d !important;
-      border-color: #30363d !important;
-      color: var(--text-main) !important;
-    }
-    .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
-
-    /* Header Bar */
+    /* Header Bar - Airy Frosted White */
     .app-header {
-      background: rgba(13, 17, 23, 0.86);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.9);
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.06);
       color: var(--text-main);
-      padding: 14px 16px;
+      padding: 13px 16px;
       position: sticky;
       top: 0;
       z-index: 1000;
@@ -87,7 +76,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      letter-spacing: 0.2px;
+      color: #0f172a;
     }
 
     .app-header .sub-date {
@@ -97,32 +86,35 @@
     }
 
     .btn-back-home {
-      background: rgba(240, 246, 252, 0.08);
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
+      background: #ffffff;
+      color: #334155;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
       padding: 6px 12px;
       font-size: 0.85rem;
-      font-weight: 500;
+      font-weight: 600;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       cursor: pointer;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
     }
 
     .btn-back-home:active {
-      background: rgba(240, 246, 252, 0.16);
+      background: #f1f5f9;
     }
 
     /* Building Cards (Home Screen) */
     .building-card {
       background: var(--card-bg-glass);
-      border-radius: 16px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-radius: 20px;
       overflow: hidden;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      border: 1.5px solid rgba(255, 255, 255, 0.95);
+      box-shadow: var(--shadow-soft);
       cursor: pointer;
-      transition: transform 0.15s ease, border-color 0.15s ease;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
       margin-bottom: 16px;
     }
 
@@ -131,15 +123,15 @@
     }
 
     .building-card.has-pending {
-      border: 1.5px solid rgba(248, 81, 73, 0.65);
-      box-shadow: 0 8px 24px rgba(248, 81, 73, 0.14);
+      border: 1.5px solid rgba(248, 113, 113, 0.55);
+      box-shadow: 0 10px 28px rgba(239, 68, 68, 0.12);
     }
 
     .bld-status-pending {
-      background: rgba(248, 81, 73, 0.18);
-      color: #ff7b72;
-      border: 1px solid rgba(248, 81, 73, 0.5);
-      font-size: 0.75rem;
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      font-size: 0.76rem;
       font-weight: 700;
       padding: 3px 10px;
       border-radius: 20px;
@@ -149,10 +141,10 @@
     }
 
     .bld-status-clear {
-      background: rgba(63, 185, 80, 0.15);
-      color: #3fb950;
-      border: 1px solid rgba(63, 185, 80, 0.4);
-      font-size: 0.75rem;
+      background: #f0fdf4;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+      font-size: 0.76rem;
       font-weight: 600;
       padding: 3px 10px;
       border-radius: 20px;
@@ -162,10 +154,10 @@
     }
 
     .bld-status-empty {
-      background: rgba(139, 148, 158, 0.12);
-      color: var(--text-muted);
-      border: 1px solid var(--border-color);
-      font-size: 0.75rem;
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+      font-size: 0.76rem;
       font-weight: 600;
       padding: 3px 10px;
       border-radius: 20px;
@@ -189,7 +181,7 @@
     }
 
     .building-card-body {
-      padding: 12px 16px 10px 16px;
+      padding: 13px 16px 10px 16px;
       background: transparent;
       display: flex;
       justify-content: space-between;
@@ -198,8 +190,8 @@
     }
 
     .building-title {
-      color: var(--text-main);
-      font-size: 1.3rem;
+      color: #0f172a;
+      font-size: 1.28rem;
       font-weight: 700;
       margin: 0;
       line-height: 1.25;
@@ -207,9 +199,9 @@
     }
 
     .btn-edit-building {
-      background: rgba(240, 246, 252, 0.06);
-      color: var(--text-main);
-      border: 1px solid var(--border-color);
+      background: #f8fafc;
+      color: #334155;
+      border: 1px solid #e2e8f0;
       border-radius: 20px;
       padding: 5px 12px;
       font-size: 0.82rem;
@@ -222,61 +214,65 @@
     }
 
     .btn-edit-building:hover, .btn-edit-building:active {
-      background: rgba(240, 246, 252, 0.14);
+      background: #e2e8f0;
     }
 
     .building-card-footer {
-      padding: 9px 16px 12px 16px;
+      padding: 10px 16px 13px 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: rgba(13, 17, 23, 0.45);
-      border-top: 1px solid var(--border-color);
+      background: rgba(248, 250, 252, 0.75);
+      border-top: 1px solid #f1f5f9;
       font-size: 0.85rem;
     }
 
     /* Active Building Banner */
     .selected-building-banner {
       background: var(--card-bg-glass);
-      border-radius: 14px;
-      border: 1px solid var(--border-color);
-      padding: 10px 12px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-radius: 18px;
+      border: 1.5px solid rgba(255, 255, 255, 0.95);
+      padding: 10px 14px;
       margin-bottom: 12px;
       display: flex;
       align-items: center;
       gap: 12px;
-      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+      box-shadow: var(--shadow-soft);
     }
 
     .selected-building-thumb {
       width: 52px;
       height: 52px;
-      border-radius: 10px;
+      border-radius: 12px;
       object-fit: cover;
       flex-shrink: 0;
       background: #ffffff;
-      border: 1px solid var(--border-color);
+      border: 1px solid #e2e8f0;
     }
 
-    /* Status Summary Scorecard (Octoverse Metric Grid Style) */
+    /* Status Summary Scorecard - Bright Pastel LuminHome Style */
     .status-summary-card {
-      background: linear-gradient(180deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.95) 100%);
-      border-radius: 16px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(238, 242, 255, 0.90) 100%);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-radius: 20px;
+      border: 1.5px solid rgba(255, 255, 255, 0.95);
+      box-shadow: var(--shadow-soft);
       overflow: hidden;
     }
 
     .status-summary-header {
-      background: rgba(240, 246, 252, 0.03);
+      background: rgba(255, 255, 255, 0.65);
       padding: 10px 14px;
-      border-bottom: 1px solid var(--border-color);
+      border-bottom: 1px solid rgba(226, 232, 240, 0.7);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.85rem;
+      font-size: 0.86rem;
       font-weight: 700;
-      color: var(--text-main);
+      color: #1e293b;
     }
 
     .status-summary-grid {
@@ -291,19 +287,15 @@
       transition: background 0.15s ease;
     }
 
-    .status-stat-col.border-start, .status-stat-col.border-end {
-      border-color: var(--border-color) !important;
-    }
-
     .status-stat-col:active {
-      background: rgba(240, 246, 252, 0.05);
+      background: rgba(99, 102, 241, 0.06);
     }
 
     .stat-label {
-      font-size: 0.8rem;
+      font-size: 0.82rem;
       font-weight: 600;
       margin-bottom: 4px;
-      color: var(--text-muted) !important;
+      color: #64748b !important;
     }
 
     .stat-num {
@@ -316,9 +308,10 @@
     /* Work Type Summary Card */
     .type-summary-card {
       background: var(--card-bg-glass);
-      border-radius: 16px;
-      border: 1px solid var(--border-color);
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(14px);
+      border-radius: 18px;
+      border: 1.5px solid rgba(255, 255, 255, 0.95);
+      box-shadow: var(--shadow-soft);
       padding: 12px 14px;
     }
 
@@ -333,26 +326,26 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background: rgba(240, 246, 252, 0.05);
-      border: 1px solid var(--border-color);
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
       border-radius: 20px;
       padding: 5px 11px;
       font-size: 0.8rem;
       font-weight: 600;
-      color: var(--text-main);
+      color: #334155;
       cursor: pointer;
       transition: all 0.15s ease;
     }
 
     .type-summary-chip.active {
-      background: var(--primary-dark);
-      border-color: var(--primary-color);
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      border-color: #6366f1;
       color: #ffffff;
     }
 
     .type-summary-chip .count-pill {
-      background: rgba(88, 166, 255, 0.18);
-      color: #79c0ff;
+      background: #e0e7ff;
+      color: #4338ca;
       border-radius: 12px;
       padding: 1px 7px;
       font-size: 0.74rem;
@@ -366,9 +359,9 @@
 
     /* Interactive Calendar with Status Dots */
     .calendar-box {
-      background: var(--surface-1);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
       padding: 10px;
       margin-top: 10px;
       margin-bottom: 10px;
@@ -382,15 +375,15 @@
     }
 
     .cal-nav-btn {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
       width: 30px;
       height: 30px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      color: var(--text-main);
+      color: #334155;
       cursor: pointer;
     }
 
@@ -400,27 +393,27 @@
       text-align: center;
       font-size: 0.72rem;
       font-weight: 700;
-      color: var(--text-muted);
+      color: #64748b;
       margin-bottom: 4px;
     }
 
     .cal-days-grid {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      gap: 3px;
+      gap: 4px;
     }
 
     .cal-day-cell {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
       min-height: 42px;
       padding: 4px 2px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      color: var(--text-main);
+      color: #1e293b;
       cursor: pointer;
       transition: all 0.12s ease;
     }
@@ -432,13 +425,13 @@
     }
 
     .cal-day-cell.today {
-      border-color: var(--primary-color);
-      background: rgba(88, 166, 255, 0.12);
+      border-color: #6366f1;
+      background: #eef2ff;
     }
 
     .cal-day-cell.selected {
-      background: var(--primary-dark);
-      border-color: var(--primary-color);
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      border-color: #6366f1;
       color: #ffffff;
     }
 
@@ -462,9 +455,9 @@
       display: inline-block;
     }
 
-    .dot-pending { background-color: #f0883e; }
-    .dot-inprogress { background-color: #58a6ff; }
-    .dot-done { background-color: #3fb950; }
+    .dot-pending { background-color: #f59e0b; }
+    .dot-inprogress { background-color: #3b82f6; }
+    .dot-done { background-color: #22c55e; }
     .cal-day-cell.selected .dot-inprogress { background-color: #bae6fd; }
 
     .cal-legend {
@@ -473,7 +466,7 @@
       gap: 12px;
       margin-top: 8px;
       font-size: 0.72rem;
-      color: var(--text-muted);
+      color: #475569;
     }
 
     .cal-legend span {
@@ -485,11 +478,12 @@
     /* Step Card */
     .step-card {
       background: var(--card-bg-glass);
-      border-radius: 14px;
-      border: 1px solid var(--border-color);
+      backdrop-filter: blur(14px);
+      border-radius: 18px;
+      border: 1.5px solid rgba(255, 255, 255, 0.95);
       padding: 16px;
       margin-bottom: 14px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      box-shadow: var(--shadow-soft);
     }
 
     .step-header {
@@ -497,15 +491,14 @@
       align-items: center;
       gap: 10px;
       margin-bottom: 12px;
-      font-weight: 600;
-      color: var(--primary-color);
+      font-weight: 700;
+      color: #4338ca;
       font-size: 1rem;
     }
 
     .step-badge {
-      background: rgba(88, 166, 255, 0.16);
-      color: #79c0ff;
-      border: 1px solid rgba(88, 166, 255, 0.35);
+      background: #e0e7ff;
+      color: #4338ca;
       width: 26px;
       height: 26px;
       border-radius: 50%;
@@ -526,10 +519,10 @@
 
     .time-mode-btn {
       flex: 1;
-      border: 1px solid var(--border-color);
-      background: var(--surface-1);
-      color: var(--text-muted);
-      border-radius: 10px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #64748b;
+      border-radius: 12px;
       padding: 8px 10px;
       font-size: 0.85rem;
       font-weight: 600;
@@ -542,30 +535,30 @@
     }
 
     .time-mode-btn.active-live {
-      background: rgba(88, 166, 255, 0.15);
-      border-color: var(--primary-color);
-      color: #79c0ff;
+      background: #eef2ff;
+      border-color: #6366f1;
+      color: #4338ca;
     }
 
     .time-mode-btn.active-backdate {
-      background: rgba(210, 153, 34, 0.18);
-      border-color: var(--accent-amber);
-      color: #e3b341;
+      background: #fffbeb;
+      border-color: #f59e0b;
+      color: #b45309;
     }
 
     /* Camera Upload Box */
     .camera-box {
-      border: 1.5px dashed rgba(88, 166, 255, 0.45);
-      border-radius: 12px;
+      border: 2px dashed #a5b4fc;
+      border-radius: 16px;
       padding: 20px;
       text-align: center;
-      background: rgba(88, 166, 255, 0.06);
+      background: #eef2ff;
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
     .camera-box:active {
-      background: rgba(88, 166, 255, 0.14);
+      background: #e0e7ff;
       transform: scale(0.99);
     }
 
@@ -577,11 +570,11 @@
 
     .preview-container {
       position: relative;
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
       margin-top: 8px;
       display: none;
-      border: 1px solid var(--border-color);
+      border: 1px solid #e2e8f0;
     }
 
     .preview-container img {
@@ -595,9 +588,9 @@
       position: absolute;
       top: 10px;
       right: 10px;
-      background: rgba(13, 17, 23, 0.85);
+      background: rgba(15, 23, 42, 0.72);
       color: white;
-      border: 1px solid var(--border-color);
+      border: none;
       border-radius: 20px;
       padding: 6px 14px;
       font-size: 0.82rem;
@@ -613,11 +606,11 @@
 
     .multi-thumb-wrap {
       position: relative;
-      border-radius: 10px;
+      border-radius: 12px;
       overflow: hidden;
-      border: 1px solid var(--border-color);
+      border: 1px solid #e2e8f0;
       aspect-ratio: 1 / 1;
-      background: var(--surface-1);
+      background: #f8fafc;
     }
 
     .multi-thumb-wrap img {
@@ -634,8 +627,8 @@
       width: 22px;
       height: 22px;
       border-radius: 50%;
-      border: 1px solid var(--border-color);
-      background: rgba(13, 17, 23, 0.88);
+      border: none;
+      background: rgba(15, 23, 42, 0.78);
       color: #ffffff;
       font-size: 0.72rem;
       display: flex;
@@ -653,57 +646,53 @@
       position: absolute;
       bottom: 4px;
       right: 4px;
-      background: rgba(13, 17, 23, 0.88);
+      background: rgba(15, 23, 42, 0.8);
       color: #ffffff;
       font-size: 0.7rem;
       font-weight: 700;
       padding: 1px 6px;
       border-radius: 8px;
-      border: 1px solid var(--border-color);
     }
 
     /* Form Controls */
     .form-label {
       font-size: 0.88rem;
       font-weight: 600;
-      color: #c9d1d9;
+      color: #334155;
       margin-bottom: 5px;
     }
 
     .form-control, .form-select {
-      background-color: var(--surface-1) !important;
-      color: var(--text-main) !important;
-      border-radius: 10px;
-      border: 1px solid #30363d;
+      background-color: #ffffff !important;
+      color: #0f172a !important;
+      border-radius: 12px;
+      border: 1px solid #cbd5e1;
       padding: 10px 13px;
       font-size: 0.95rem;
     }
 
     .form-control::placeholder {
-      color: #6e7681;
+      color: #94a3b8;
     }
 
     .form-control:focus, .form-select:focus {
-      background-color: var(--surface-1) !important;
-      color: var(--text-main) !important;
+      background-color: #ffffff !important;
+      color: #0f172a !important;
       border-color: var(--primary-color);
-      box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
     }
 
-    input[type="date"], input[type="time"] {
-      color-scheme: dark;
-    }
-
-    /* Bottom Navigation */
+    /* Bottom Navigation - Floating Frosted Glass */
     .bottom-nav {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      background: rgba(13, 17, 23, 0.92);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-top: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-top: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: 0 -4px 20px rgba(99, 102, 241, 0.08);
       display: none;
       justify-content: space-around;
       padding: 8px 0;
@@ -718,9 +707,9 @@
       justify-content: center;
       border: none;
       background: none;
-      color: var(--text-muted);
+      color: #64748b;
       font-size: 0.78rem;
-      font-weight: 500;
+      font-weight: 600;
       padding: 4px 0;
       gap: 3px;
     }
@@ -734,23 +723,91 @@
       font-weight: 700;
     }
 
-    /* Log Card */
+    /* Log Card - Bright Airy Done vs Unfinished Hierarchy */
     .log-card {
-      background: var(--card-bg-glass);
-      border-radius: 14px;
-      border: 1px solid var(--border-color);
-      padding: 14px;
-      margin-bottom: 12px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+      background: rgba(255, 255, 255, 0.94);
+      border-radius: 18px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-soft);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
+    .log-card.card-pending {
+      border: 1px solid #fcd34d;
+      border-left: 5px solid #f59e0b;
+      background: linear-gradient(135deg, #fffbeb 0%, #ffffff 42%);
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.10);
+    }
+
+    .log-card.card-inprogress {
+      border: 1px solid #93c5fd;
+      border-left: 5px solid #3b82f6;
+      background: linear-gradient(135deg, #eff6ff 0%, #ffffff 42%);
+      box-shadow: 0 6px 20px rgba(59, 130, 246, 0.10);
+    }
+
+    .log-card.card-done {
+      border: 1px solid #bbf7d0;
+      border-left: 5px solid #22c55e;
+      background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 42%);
+      opacity: 0.86;
+    }
+
+    .log-card.card-done:hover {
+      opacity: 1;
+    }
+
+    .log-card-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    }
+
+    .banner-pending {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    .banner-inprogress {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .banner-done {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .log-card-inner {
+      padding: 12px 14px 14px 14px;
+    }
+
+    .status-filter-btn-unfinished {
+      border: 1px solid #fca5a5 !important;
+      background: #fef2f2 !important;
+      color: #dc2626 !important;
+    }
+
+    .status-filter-btn-unfinished.active {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+      color: #ffffff !important;
+      border-color: #ef4444 !important;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.28);
     }
 
     .badge-floor {
-      background: rgba(88, 166, 255, 0.16);
-      color: #79c0ff;
-      border: 1px solid rgba(88, 166, 255, 0.35);
+      background: #eef2ff;
+      color: #4338ca;
+      border: 1px solid #c7d2fe;
       font-weight: 600;
       padding: 4px 9px;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 0.78rem;
     }
 
@@ -759,26 +816,26 @@
       align-items: center;
       gap: 4px;
       padding: 3px 9px;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 0.76rem;
       font-weight: 700;
     }
 
     .urgency-high {
-      background: #da3633;
+      background: #ef4444;
       color: #ffffff;
     }
 
     .urgency-med {
-      background: rgba(240, 136, 62, 0.18);
-      color: #ffa657;
-      border: 1px solid rgba(240, 136, 62, 0.5);
+      background: #ffedd5;
+      color: #c2410c;
+      border: 1px solid #fdba74;
     }
 
     .urgency-low {
-      background: rgba(210, 153, 34, 0.18);
-      color: #e3b341;
-      border: 1px solid rgba(210, 153, 34, 0.45);
+      background: #fef9c3;
+      color: #854d0e;
+      border: 1px solid #fde047;
     }
 
     .btn-add-photo-later {
@@ -790,13 +847,13 @@
     }
 
     .badge-type {
-      background: rgba(63, 185, 80, 0.15);
-      color: #3fb950;
+      background: #f0fdf4;
+      color: #15803d;
       font-weight: 600;
       padding: 4px 9px;
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 0.78rem;
-      border: 1px solid rgba(63, 185, 80, 0.35);
+      border: 1px solid #bbf7d0;
     }
 
     /* Status Badges & Controls */
@@ -811,21 +868,21 @@
     }
 
     .status-pending {
-      background: rgba(210, 153, 34, 0.18);
-      color: #e3b341;
-      border: 1px solid rgba(210, 153, 34, 0.45);
+      background: #fef3c7;
+      color: #b45309;
+      border: 1px solid #fde68a;
     }
 
     .status-inprogress {
-      background: rgba(88, 166, 255, 0.16);
-      color: #79c0ff;
-      border: 1px solid rgba(88, 166, 255, 0.4);
+      background: #dbeafe;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
     }
 
     .status-done {
-      background: rgba(63, 185, 80, 0.16);
-      color: #3fb950;
-      border: 1px solid rgba(63, 185, 80, 0.4);
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
     }
 
     .days-badge {
@@ -839,24 +896,24 @@
     }
 
     .days-today {
-      background: rgba(139, 148, 158, 0.15);
-      color: #c9d1d9;
-      border: 1px solid var(--border-color);
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
     }
 
     .days-warn {
-      background: rgba(240, 136, 62, 0.18);
-      color: #ffa657;
-      border: 1px solid rgba(240, 136, 62, 0.45);
+      background: #ffedd5;
+      color: #c2410c;
+      border: 1px solid #fed7aa;
     }
 
     .cost-badge {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      background: rgba(63, 185, 80, 0.14);
-      color: #3fb950;
-      border: 1px solid rgba(63, 185, 80, 0.35);
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
       padding: 2px 9px;
       border-radius: 12px;
       font-size: 0.78rem;
@@ -868,9 +925,9 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      background: rgba(139, 148, 158, 0.12);
-      color: #8b949e;
-      border: 1px dashed rgba(139, 148, 158, 0.4);
+      background: #f8fafc;
+      color: #64748b;
+      border: 1px dashed #cbd5e1;
       padding: 2px 9px;
       border-radius: 12px;
       font-size: 0.76rem;
@@ -879,13 +936,13 @@
     }
 
     .days-done {
-      background: rgba(63, 185, 80, 0.14);
-      color: #3fb950;
-      border: 1px solid rgba(63, 185, 80, 0.35);
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
     }
 
     .activity-item {
-      border-left: 2px solid #30363d;
+      border-left: 2px solid #e2e8f0;
       padding: 0 0 14px 14px;
       margin-left: 6px;
       position: relative;
@@ -905,20 +962,20 @@
       top: 4px;
     }
 
-    .act-dot-new { background: #58a6ff; box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2); }
-    .act-dot-done { background: #3fb950; box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.2); }
-    .act-dot-prog { background: #e3b341; box-shadow: 0 0 0 3px rgba(227, 179, 65, 0.2); }
+    .act-dot-new { background: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+    .act-dot-done { background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2); }
+    .act-dot-prog { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2); }
 
     .days-danger {
-      background: rgba(248, 81, 73, 0.2);
-      color: #ff7b72;
-      border: 1px solid rgba(248, 81, 73, 0.5);
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
     }
 
     .status-update-bar {
       margin-top: 10px;
       padding-top: 10px;
-      border-top: 1px dashed var(--border-color);
+      border-top: 1px dashed #e2e8f0;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -926,13 +983,13 @@
     }
 
     .status-select-sm {
-      border-radius: 8px;
-      border: 1px solid #30363d;
+      border-radius: 10px;
+      border: 1px solid #cbd5e1;
       padding: 5px 10px;
       font-size: 0.82rem;
       font-weight: 600;
-      background-color: var(--surface-1);
-      color: var(--text-main);
+      background-color: #f8fafc;
+      color: #0f172a;
       max-width: 195px;
     }
 
@@ -945,9 +1002,9 @@
     }
 
     .status-filter-btn {
-      border: 1px solid var(--border-color);
-      background: var(--surface-1);
-      color: var(--text-muted);
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #475569;
       border-radius: 20px;
       padding: 4px 12px;
       font-size: 0.78rem;
@@ -957,42 +1014,43 @@
     }
 
     .status-filter-btn.active {
-      background: #f0f6fc;
-      color: #0d1117;
-      border-color: #f0f6fc;
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      color: #ffffff;
+      border-color: #6366f1;
     }
 
     .log-img-thumb {
       width: 78px;
       height: 78px;
-      border-radius: 10px;
+      border-radius: 12px;
       object-fit: cover;
       cursor: pointer;
-      border: 1px solid var(--border-color);
+      border: 1px solid #e2e8f0;
       flex-shrink: 0;
     }
 
     .modal-content {
-      background-color: var(--card-bg) !important;
-      color: var(--text-main) !important;
-      border: 1px solid var(--border-color) !important;
+      background-color: #ffffff !important;
+      color: #1e293b !important;
+      border: 1px solid rgba(226, 232, 240, 0.9) !important;
+      box-shadow: 0 20px 50px rgba(99, 102, 241, 0.16) !important;
     }
 
     .modal-img-full {
       width: 100%;
-      border-radius: 10px;
+      border-radius: 12px;
     }
 
     .btn-submit {
-      background: linear-gradient(135deg, #f0f6fc 0%, #d0d7de 100%);
-      color: #0d1117;
-      border-radius: 12px;
+      background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+      color: #ffffff;
+      border-radius: 14px;
       padding: 14px;
       font-size: 1.05rem;
       font-weight: 700;
       border: none;
       width: 100%;
-      box-shadow: 0 4px 16px rgba(240, 246, 252, 0.16);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.32);
     }
 
     .btn-submit:disabled {
@@ -1004,24 +1062,16 @@
       width: 100%;
       height: 160px;
       object-fit: cover;
-      border-radius: 12px;
-      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
     }
 
-    /* Dark Theme for SweetAlert2 */
+    /* Bright Modern SweetAlert2 */
     .swal2-popup {
-      background: #161b22 !important;
-      color: #f0f6fc !important;
-      border: 1px solid rgba(240, 246, 252, 0.15) !important;
-      border-radius: 16px !important;
-    }
-    .swal2-title, .swal2-html-container {
-      color: #f0f6fc !important;
-    }
-    .swal2-input {
-      background: #0d1117 !important;
-      color: #f0f6fc !important;
-      border: 1px solid #30363d !important;
+      background: #ffffff !important;
+      color: #1e293b !important;
+      border-radius: 20px !important;
+      box-shadow: 0 20px 50px rgba(99, 102, 241, 0.18) !important;
     }
   </style>
 </head>
@@ -1273,20 +1323,20 @@
           <div class="status-summary-grid">
             <div class="status-stat-col" onclick="setStatusFilter('รอดำเนินการ', document.getElementById('filterPillPending'))">
               <div class="stat-label" style="color: #8b949e;">รอดำเนินการ</div>
-              <div class="stat-num" style="color: #e3b341;" id="sumPending">0</div>
+              <div class="stat-num" style="color: #d97706;" id="sumPending">0</div>
             </div>
             <div class="status-stat-col border-start border-end" onclick="setStatusFilter('กำลังดำเนินการ', document.getElementById('filterPillInProgress'))">
               <div class="stat-label" style="color: #8b949e;">กำลังดำเนินการ</div>
-              <div class="stat-num" style="color: #58a6ff;" id="sumInProgress">0</div>
+              <div class="stat-num" style="color: #2563eb;" id="sumInProgress">0</div>
             </div>
             <div class="status-stat-col" onclick="setStatusFilter('ดำเนินการเสร็จสิ้น', document.getElementById('filterPillDone'))">
               <div class="stat-label" style="color: #8b949e;">เสร็จสิ้นแล้ว</div>
-              <div class="stat-num" style="color: #3fb950;" id="sumDone">0</div>
+              <div class="stat-num" style="color: #16a34a;" id="sumDone">0</div>
             </div>
           </div>
-          <div class="px-3 py-2 border-top d-flex justify-content-between align-items-center" style="background: rgba(63, 185, 80, 0.06); font-size: 0.84rem;">
+          <div class="px-3 py-2 border-top d-flex justify-content-between align-items-center" style="background: rgba(240, 253, 244, 0.85); font-size: 0.84rem;">
             <span class="text-muted"><i class="fa-solid fa-coins text-success me-1"></i> ค่าใช้จ่ายรวม</span>
-            <strong style="color: #3fb950;" id="sumTotalCost">0 บาท</strong>
+            <strong style="color: #16a34a;" id="sumTotalCost">0 บาท</strong>
           </div>
         </div>
 
@@ -1304,10 +1354,13 @@
         <div class="card border-0 shadow-sm rounded-4 p-3 mb-3 bg-white">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <label class="form-label fw-bold mb-0"><i class="fa-regular fa-calendar-days me-1 text-primary"></i> ดูงานทั้งหมด / ปฏิทิน</label>
-            <div class="d-flex gap-1">
-              <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" id="btnDateAll" onclick="selectCalendarDate('ALL')">ทั้งหมด</button>
-              <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" id="btnToggleCalendar" onclick="toggleCalendar()">
-                <i class="fa-regular fa-calendar me-1"></i> ปฏิทิน
+            <div class="d-flex flex-wrap gap-1">
+              <button type="button" class="btn btn-danger btn-sm rounded-pill px-3 fw-bold" id="btnQuickUnfinished" onclick="showAllUnfinishedInBuilding()">
+                <i class="fa-solid fa-fire me-1"></i> งานค้าง (<span id="quickUnfinishedCount">0</span>)
+              </button>
+              <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" id="btnDateAll" onclick="showAllJobsInBuilding()">ทั้งหมด</button>
+              <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-2" id="btnToggleCalendar" onclick="toggleCalendar()">
+                <i class="fa-regular fa-calendar"></i>
               </button>
             </div>
           </div>
@@ -1348,9 +1401,10 @@
           <!-- ตัวกรองตามสถานะ -->
           <div class="status-filter-pills">
             <button type="button" class="status-filter-btn active" id="filterPillAll" onclick="setStatusFilter('ALL', this)">ทุกสถานะ</button>
+            <button type="button" class="status-filter-btn status-filter-btn-unfinished" id="filterPillUnfinished" onclick="setStatusFilter('UNFINISHED', this)">🔥 งานค้างทั้งหมด (0)</button>
             <button type="button" class="status-filter-btn" id="filterPillPending" onclick="setStatusFilter('รอดำเนินการ', this)">รอดำเนินการ</button>
             <button type="button" class="status-filter-btn" id="filterPillInProgress" onclick="setStatusFilter('กำลังดำเนินการ', this)">กำลังดำเนินการ</button>
-            <button type="button" class="status-filter-btn" id="filterPillDone" onclick="setStatusFilter('ดำเนินการเสร็จสิ้น', this)">เสร็จสิ้นแล้ว</button>
+            <button type="button" class="status-filter-btn" id="filterPillDone" onclick="setStatusFilter('ดำเนินการเสร็จสิ้น', this)">✅ เสร็จสิ้นแล้ว</button>
           </div>
         </div>
 
@@ -1618,7 +1672,7 @@
       const headerCount = document.getElementById('headerRightTitle');
       headerCount.innerHTML = `
         <div class="d-flex align-items-center gap-1">
-          <button type="button" class="btn btn-outline-light btn-sm rounded-pill px-2 py-1" style="font-size:0.78rem;" onclick="openActivityModal('ALL')">
+          <button type="button" class="btn btn-light border btn-sm rounded-pill px-2 py-1 text-dark" style="font-size:0.78rem;" onclick="openActivityModal('ALL')">
             <i class="fa-solid fa-bell text-warning me-1"></i> ประวัติ
           </button>
           <span class="badge bg-primary px-2 py-1"><i class="fa-solid fa-building me-1"></i> ${buildingsList.length}</span>
@@ -1699,7 +1753,7 @@
       document.getElementById('headerBuildingLeft').style.display = 'block';
       document.getElementById('headerRightTitle').innerHTML = `
         <div class="d-flex align-items-center gap-1">
-          <button type="button" class="btn btn-outline-light btn-sm rounded-pill px-2 py-1" style="font-size:0.78rem;" onclick="openActivityModal('CURRENT')">
+          <button type="button" class="btn btn-light border btn-sm rounded-pill px-2 py-1 text-dark" style="font-size:0.78rem;" onclick="openActivityModal('CURRENT')">
             <i class="fa-solid fa-bell text-warning me-1"></i> ประวัติ
           </button>
           <button type="button" class="btn btn-primary btn-sm rounded-pill px-2 py-1 fw-bold" style="font-size:0.78rem;" onclick="switchWorkspaceTab('add'); window.scrollTo({top: 0, behavior: 'smooth'});">
@@ -2108,6 +2162,26 @@
       renderFilteredLogs();
     }
 
+    function showAllUnfinishedInBuilding() {
+      selectedDateFilter = 'ALL';
+      workTypeFilter = 'ALL';
+      const selectWt = document.getElementById('filterWorkType');
+      if (selectWt) selectWt.value = 'ALL';
+      const btnAll = document.getElementById('btnDateAll');
+      if (btnAll) btnAll.className = 'btn btn-outline-primary btn-sm rounded-pill px-3';
+      setStatusFilter('UNFINISHED', document.getElementById('filterPillUnfinished'));
+    }
+
+    function showAllJobsInBuilding() {
+      selectedDateFilter = 'ALL';
+      workTypeFilter = 'ALL';
+      const selectWt = document.getElementById('filterWorkType');
+      if (selectWt) selectWt.value = 'ALL';
+      const btnAll = document.getElementById('btnDateAll');
+      if (btnAll) btnAll.className = 'btn btn-primary btn-sm rounded-pill px-3';
+      setStatusFilter('ALL', document.getElementById('filterPillAll'));
+    }
+
     function renderCalendar() {
       const grid = document.getElementById('calDaysGrid');
       const titleEl = document.getElementById('calMonthTitle');
@@ -2187,10 +2261,19 @@
       const inProgress = allLogs.filter(l => !l.workStatus || l.workStatus === 'กำลังดำเนินการ').length;
       const done = allLogs.filter(l => l.workStatus === 'ดำเนินการเสร็จสิ้น').length;
 
+      const allBldLogs = window._currentLogsCache || [];
+      const totalUnfinishedInBld = allBldLogs.filter(l => l.workStatus !== 'ดำเนินการเสร็จสิ้น').length;
+      const scopedUnfinished = pending + inProgress;
+
       document.getElementById('sumTotalBadge').innerText = `ทั้งหมด: ${total} งาน`;
       document.getElementById('sumPending').innerText = pending;
       document.getElementById('sumInProgress').innerText = inProgress;
       document.getElementById('sumDone').innerText = done;
+
+      const quickUnfEl = document.getElementById('quickUnfinishedCount');
+      if (quickUnfEl) quickUnfEl.innerText = totalUnfinishedInBld;
+      const pillUnfEl = document.getElementById('filterPillUnfinished');
+      if (pillUnfEl) pillUnfEl.innerText = `🔥 งานค้างทั้งหมด (${scopedUnfinished})`;
       const totalCost = allLogs.reduce((acc, l) => acc + (Number(l.cost) || 0), 0);
       const costEl = document.getElementById('sumTotalCost');
       if (costEl) costEl.innerText = `${totalCost.toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท`;
@@ -2383,7 +2466,9 @@
       if (calendarVisible) renderCalendar();
 
       let logs = dateScopedLogs;
-      if (statusFilter !== 'ALL') {
+      if (statusFilter === 'UNFINISHED') {
+        logs = logs.filter(l => l.workStatus !== 'ดำเนินการเสร็จสิ้น');
+      } else if (statusFilter !== 'ALL') {
         logs = logs.filter(l => l.workStatus === statusFilter);
       }
       if (workTypeFilter !== 'ALL') {
@@ -2435,48 +2520,64 @@
         const elapsedBadge = getElapsedDaysBadgeHtml(log.date, currentStatus, log.statusUpdatedAt);
         const updatedInfo = log.statusUpdatedAt ? `<small class="text-muted d-block" style="font-size:0.7rem;">อัปเดต: ${log.statusUpdatedAt}</small>` : '';
 
+        let cardStatusCls = 'card-inprogress';
+        let bannerCls = 'banner-inprogress';
+        let bannerTitle = '<i class="fa-solid fa-screwdriver-wrench me-1"></i> ยังไม่เสร็จ • กำลังดำเนินการ';
+        if (currentStatus === 'รอดำเนินการ') {
+          cardStatusCls = 'card-pending';
+          bannerCls = 'banner-pending';
+          bannerTitle = '<i class="fa-regular fa-hourglass-half me-1"></i> ยังไม่เสร็จ • รอดำเนินการ';
+        } else if (currentStatus === 'ดำเนินการเสร็จสิ้น') {
+          cardStatusCls = 'card-done';
+          bannerCls = 'banner-done';
+          bannerTitle = '<i class="fa-solid fa-circle-check me-1"></i> เสร็จสิ้นแล้ว';
+        }
+
         html += `
-          <div class="log-card" id="log-card-${log.rowId}">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <div class="d-flex flex-wrap gap-1 align-items-center">
+          <div class="log-card ${cardStatusCls}" id="log-card-${log.rowId}">
+            <div class="log-card-banner ${bannerCls}">
+              <span>${bannerTitle}</span>
+              <span style="font-size: 0.76rem; font-weight: 600; opacity: 0.92;">
+                <i class="fa-regular fa-clock me-1"></i>${log.date} • ${log.time} น.
+              </span>
+            </div>
+
+            <div class="log-card-inner">
+              <div class="d-flex flex-wrap gap-1 align-items-center mb-2">
                 <span class="badge-floor">${log.floor}</span>
                 <span class="badge-type">${log.workType}</span>
                 ${getUrgencyBadgeHtml(log.urgency)}
               </div>
-              <div class="text-end">
-                <span class="text-primary fw-bold small d-block"><i class="fa-regular fa-clock me-1"></i>${log.time} น.</span>
-                <small class="text-muted" style="font-size: 0.72rem;">${log.date}</small>
-              </div>
-            </div>
 
-            <div class="d-flex gap-3 align-items-start">
-              ${imgTag}
-              <div class="flex-grow-1">
-                ${log.requesterName ? `<div class="text-muted small mb-1"><i class="fa-solid fa-user-pen me-1"></i> ผู้ฝากงาน: <strong>${log.requesterName}</strong></div>` : ''}
-                <div class="text-muted small mb-1">
-                  <i class="fa-solid fa-user-tag me-1"></i> ผู้ปฏิบัติงาน: <strong>${log.contractor}</strong>
+              <div class="d-flex gap-3 align-items-start">
+                ${imgTag}
+                <div class="flex-grow-1">
+                  ${log.requesterName ? `<div class="text-muted small mb-1"><i class="fa-solid fa-user-pen me-1"></i> ผู้ฝากงาน: <strong>${log.requesterName}</strong></div>` : ''}
+                  <div class="text-muted small mb-1">
+                    <i class="fa-solid fa-user-tag me-1"></i> ผู้ปฏิบัติงาน: <strong>${log.contractor}</strong>
+                  </div>
+                  <div class="text-dark mb-1" style="font-size: 0.96rem; font-weight: 500; line-height: 1.45;">
+                    ${log.details}
+                  </div>
+                  <div>
+                    ${(log.cost !== "" && log.cost !== null && log.cost !== undefined && Number(log.cost) > 0)
+                      ? `<span class="cost-badge" onclick="editWorkCost(${log.rowId})"><i class="fa-solid fa-baht-sign"></i> ${Number(log.cost).toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท <i class="fa-solid fa-pen ms-1" style="font-size:0.65rem;"></i></span>`
+                      : `<span class="cost-badge-empty" onclick="editWorkCost(${log.rowId})"><i class="fa-solid fa-plus"></i> ระบุค่าใช้จ่าย</span>`}
+                  </div>
                 </div>
-                <div class="text-dark mb-1" style="font-size: 0.94rem; line-height: 1.45;">
-                  ${log.details}
-                </div>
+              </div>
+
+              <div class="status-update-bar">
                 <div>
-                  ${(log.cost !== "" && log.cost !== null && log.cost !== undefined && Number(log.cost) > 0)
-                    ? `<span class="cost-badge" onclick="editWorkCost(${log.rowId})"><i class="fa-solid fa-baht-sign"></i> ${Number(log.cost).toLocaleString('th-TH', { maximumFractionDigits: 2 })} บาท <i class="fa-solid fa-pen ms-1" style="font-size:0.65rem;"></i></span>`
-                    : `<span class="cost-badge-empty" onclick="editWorkCost(${log.rowId})"><i class="fa-solid fa-plus"></i> ระบุค่าใช้จ่าย</span>`}
+                  <div id="status-badge-${log.rowId}" class="d-flex flex-wrap align-items-center gap-1">${statusBadge}${elapsedBadge}</div>
+                  <div id="status-time-${log.rowId}">${updatedInfo}</div>
                 </div>
+                <select class="status-select-sm" onchange="handleStatusUpdate(${log.rowId}, this.value, this)">
+                  <option value="รอดำเนินการ" ${currentStatus === 'รอดำเนินการ' ? 'selected' : ''}>รอดำเนินการ</option>
+                  <option value="กำลังดำเนินการ" ${currentStatus === 'กำลังดำเนินการ' ? 'selected' : ''}>กำลังดำเนินการ</option>
+                  <option value="ดำเนินการเสร็จสิ้น" ${currentStatus === 'ดำเนินการเสร็จสิ้น' ? 'selected' : ''}>ดำเนินการเสร็จสิ้น</option>
+                </select>
               </div>
-            </div>
-
-            <div class="status-update-bar">
-              <div>
-                <div id="status-badge-${log.rowId}" class="d-flex flex-wrap align-items-center gap-1">${statusBadge}${elapsedBadge}</div>
-                <div id="status-time-${log.rowId}">${updatedInfo}</div>
-              </div>
-              <select class="status-select-sm" onchange="handleStatusUpdate(${log.rowId}, this.value, this)">
-                <option value="รอดำเนินการ" ${currentStatus === 'รอดำเนินการ' ? 'selected' : ''}>รอดำเนินการ</option>
-                <option value="กำลังดำเนินการ" ${currentStatus === 'กำลังดำเนินการ' ? 'selected' : ''}>กำลังดำเนินการ</option>
-                <option value="ดำเนินการเสร็จสิ้น" ${currentStatus === 'ดำเนินการเสร็จสิ้น' ? 'selected' : ''}>ดำเนินการเสร็จสิ้น</option>
-              </select>
             </div>
           </div>
         `;
